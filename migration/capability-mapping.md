@@ -42,6 +42,7 @@ New contract direction:
 
 Old sources:
 - `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`
+- `codewiki/anchors/storage.py`
 - Parser substrate under `codewiki/infrastructure/treesitter/*`
 - Vendored analyzer code under `codewiki/vendor/fsoft_codewiki`
 - Anchor tests and pipeline coverage in `tests/test_anchors/*`, `tests/test_pipeline/test_scope_first_pipeline.py`
@@ -49,6 +50,7 @@ Old sources:
 Carry forward:
 - Deterministic extraction of definitions, declarations, relations, and augmented field-level anchor details
 - Local parser integration from `codewiki/infrastructure/treesitter/*` and the vendored analyzer family that can run offline against harvested repositories
+- Anchor persistence and lookup state stay traceable through `codewiki/anchors/storage.py`
 - Existing test-backed expectations for anchor lookup on the synthetic baseline fixture
 
 New contract direction:
@@ -155,7 +157,7 @@ New contract direction:
 - `AskService` wraps slice planning, evidence building, and conservative answer summarization; preserve the underlying logic where it is still useful, but drop the top-level ask shell as a product surface.
 - The old runtime registry is a good source of tool boundaries and safety guardrails, especially around `plan_slice`, `expand_slice`, `read_evidence_pack`, and guarded `open_span`, but the new repository is not a chat runtime and should not inherit session orchestration as architecture.
 - Legacy CLI commands and demo exports can inform MCP tool naming, manifest shape, and export expectations, but they do not survive as compatibility surfaces.
-- Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
+- Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, with anchor persistence explicitly traceable through `codewiki/anchors/storage.py`, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
 - `agent_runtime`, `ask`, and `answers` are not preserved as top-level product surfaces; only the logic that the matrix and explicit non-mappings retain may be harvested into new MCP/domain contracts.
 
 ## Explicit Non-Mappings

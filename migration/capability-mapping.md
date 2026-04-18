@@ -78,7 +78,7 @@ New contract direction:
 ## evidence
 
 Old sources:
-- `codewiki/evidence/builder.py`, `codewiki/evidence/citations.py`, `codewiki/evidence/models.py`, `codewiki/evidence/renderers.py`
+- `codewiki/evidence/builder.py`, `codewiki/evidence/citations.py`, `codewiki/evidence/models.py`
 - `codewiki/retrieval/service.py`, `codewiki/retrieval/freshness.py`, `codewiki/retrieval/snippets.py`
 - Guarded runtime `open_span` and old visible surface `get_repo_freshness`
 - Tests in `tests/test_evidence/*`, `tests/test_retrieval/*`, `tests/test_agent_runtime/test_registry.py`

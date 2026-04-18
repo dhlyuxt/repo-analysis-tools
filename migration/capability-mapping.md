@@ -41,8 +41,7 @@ New contract direction:
 ## anchors
 
 Old sources:
-- `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`
-- `codewiki/anchors/storage.py`
+- `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`, `codewiki/anchors/storage.py`
 - Parser substrate under `codewiki/infrastructure/treesitter/*`
 - Vendored analyzer code under `codewiki/vendor/fsoft_codewiki`
 - Anchor tests and pipeline coverage in `tests/test_anchors/*`, `tests/test_pipeline/test_scope_first_pipeline.py`
@@ -137,14 +136,14 @@ Old sources:
 - `codewiki/cli/bundle.py`, `codewiki/demo/export.py`
 - Legacy CLI compatibility surfaces in `codewiki/cli/main.py` and `codewiki/indexing/service.py` for `export` and `bundle`
 - Example outputs and manifests under `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/`, and `builds/easyflash-e2e-demo/`
-- Storage-layer asset concepts in `codewiki/storage/*`
+- Storage-layer context from `codewiki/storage/repo_store.py`, `codewiki/storage/slice_store.py`, and `codewiki/storage/migrations.py`
 - Export-oriented tests in `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`
 
 Carry forward:
 - The idea that analysis assets can be packaged for later reuse, comparison, review, or transport
 - Manifest-style metadata from demo artifacts that can inform bundle shape and completeness checks
 - Legacy export-oriented behavior from `codewiki/cli/bundle.py` and `codewiki/demo/export.py` is the historical seed for the new `export` domain, not for report generation
-- Storage-backed handles that make exported artifacts refer to stable scans, slices, evidence packs, and reports instead of anonymous files
+- Manifest and payload conventions that let exported artifacts refer back to scans, slices, evidence, and report inputs without assuming old storage-backed report/export handles
 
 New contract direction:
 - `export` is a new first-class domain for `export_analysis_bundle`, `export_scope_snapshot`, and `export_evidence_bundle`
@@ -157,7 +156,7 @@ New contract direction:
 - `AskService` wraps slice planning, evidence building, and conservative answer summarization; preserve the underlying logic where it is still useful, but drop the top-level ask shell as a product surface.
 - The old runtime registry is a good source of tool boundaries and safety guardrails, especially around `plan_slice`, `expand_slice`, `read_evidence_pack`, and guarded `open_span`, but the new repository is not a chat runtime and should not inherit session orchestration as architecture.
 - Legacy CLI commands and demo exports can inform MCP tool naming, manifest shape, and export expectations, but they do not survive as compatibility surfaces.
-- Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, with anchor persistence explicitly traceable through `codewiki/anchors/storage.py`, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
+- Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; durable support survives for scan state, slice state, repo metadata, and anchor persistence through `codewiki/anchors/storage.py`, while report/export outputs remain file/manifest oriented and runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
 - `agent_runtime`, `ask`, and `answers` are not preserved as top-level product surfaces; only the logic that the matrix and explicit non-mappings retain may be harvested into new MCP/domain contracts.
 
 ## Explicit Non-Mappings

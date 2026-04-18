@@ -8,6 +8,7 @@
 - Secondary review note: `docs/gpt5.4proreview.md`
 - Old-repo sources inspected for this baseline:
   - `docs/README.md`
+  - `AGENTS.md`
   - `codewiki/agent_runtime/tools/registry.py`
   - `codewiki/agent_runtime/orchestrator.py`
   - `codewiki/agent_runtime/session_manager.py`
@@ -38,6 +39,10 @@
   - `codewiki/storage/session_store.py`
   - `codewiki/storage/trace_store.py`
   - `codewiki/storage/migrations.py`
+  - `testscript/test_partition.py`
+  - `builds/easyflash-e2e-artifacts/manifest.json`
+  - `builds/easyflash-e2e-clean/README.md`
+  - `builds/easyflash-e2e-demo/README.md`
   - `tests/fixtures/scope_first_repo.py`
   - `tests/test_agent_runtime/test_registry.py`
   - `tests/test_anchors/test_service.py`
@@ -99,7 +104,7 @@
 | ask and answer shell | `codewiki/ask/service.py`, `codewiki/answers/models.py` | `AskService.answer`, `AnswerContract.to_json` | `tests/test_ask/test_service.py`, `tests/test_cli/test_main.py`, `tests/test_pipeline/test_scope_first_pipeline.py` | Yes for current contract build path | workflow shell over `slice` + `evidence` | extract logic, rewrite shell | Converts evidence packs into conservative answer contracts for symbol questions and no-match/unknown cases. |
 | legacy compatibility surface | `docs/README.md`, `codewiki/cli/main.py`, `codewiki/indexing/service.py` | README workflow, CLI `index`, `bundle`, deprecated aliases | `tests/test_cli/test_main.py`, `tests/test_pipeline/test_bundle_export.py`, `tests/test_pipeline/test_demo_export.py` | No unique value beyond wrappers | none | drop | Keeps old command names alive during transition and preserves old path assumptions. |
 | synthetic baseline fixture | `tests/fixtures/scope_first_repo.py` | `build_scope_first_repo` | `tests/test_pipeline/test_scope_first_pipeline.py`, `tests/test_agent_runtime/test_registry.py`, `tests/test_storage/test_repo_store.py` | Yes | fixtures | test-only baseline | Tiny deterministic C fixture covering primary/support/external/generated roles plus one resolvable symbol. |
-| real fixture candidates | `EasyFlash-master`, `builds/easyflash-e2e-clean`, `builds/easyflash-e2e-demo` | `AGENTS.md:29`, `testscript/test_partition.py:22`, `builds/easyflash-e2e-artifacts/manifest.json:3` | `tests/test_pipeline/test_demo_export.py`, `tests/test_pipeline/test_bundle_export.py` | N/A as inventory item | fixtures | test-only baseline | Candidate long-lived repositories for later end-to-end repo-understanding and impact scenarios. |
+| real fixture candidates | `EasyFlash-master`, `builds/easyflash-e2e-clean`, `builds/easyflash-e2e-demo` | `AGENTS.md:29`, `testscript/test_partition.py:22`, `builds/easyflash-e2e-artifacts/manifest.json:3` | `tests/test_pipeline/test_demo_export.py`, `tests/test_pipeline/test_bundle_export.py` | N/A as inventory item | fixtures | test-only baseline | Candidate long-lived repositories for later end-to-end repo-understanding and impact scenarios; the listed tests are adjacent evidence around fixture handling, not direct validation of each checked-in tree. |
 
 ## Fixtures and Example Repositories
 

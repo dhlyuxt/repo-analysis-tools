@@ -19,6 +19,7 @@ New contract direction:
 - `scan` becomes the base asset-creation domain for `scan_repo`, `refresh_scan`, and `get_scan_status`
 - The new contract should return stable scan IDs, normalized repository/runtime paths, freshness notes, and recommended next tools instead of old CLI- or session-shaped payloads
 - Scan storage remains reusable infrastructure, but the contract belongs to the domain MCP layer rather than a legacy repo-local CLI shell
+- Old visible surface `get_repo_freshness` does not survive as its own top-level domain tool; its freshness checks fold into `evidence` guardrails because they validate whether a scan-bound evidence read is still trustworthy
 
 ## scope
 
@@ -41,12 +42,13 @@ New contract direction:
 
 Old sources:
 - `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`
+- Parser substrate under `codewiki/infrastructure/treesitter/*`
 - Vendored analyzer code under `codewiki/vendor/fsoft_codewiki`
 - Anchor tests and pipeline coverage in `tests/test_anchors/*`, `tests/test_pipeline/test_scope_first_pipeline.py`
 
 Carry forward:
 - Deterministic extraction of definitions, declarations, relations, and augmented field-level anchor details
-- Local parser integration that can run offline against harvested repositories
+- Local parser integration from `codewiki/infrastructure/treesitter/*` and the vendored analyzer family that can run offline against harvested repositories
 - Existing test-backed expectations for anchor lookup on the synthetic baseline fixture
 
 New contract direction:
@@ -77,17 +79,18 @@ New contract direction:
 Old sources:
 - `codewiki/evidence/builder.py`, `codewiki/evidence/citations.py`, `codewiki/evidence/models.py`, `codewiki/evidence/renderers.py`
 - `codewiki/retrieval/service.py`, `codewiki/retrieval/freshness.py`, `codewiki/retrieval/snippets.py`
-- Guarded runtime `open_span`
+- Guarded runtime `open_span` and old visible surface `get_repo_freshness`
 - Tests in `tests/test_evidence/*`, `tests/test_retrieval/*`, `tests/test_agent_runtime/test_registry.py`
 
 Carry forward:
 - Context-pack construction from slices into citations, relations, freshness signals, and missing-data slots
-- Retrieval guardrails: scan binding, tracked-file checks, freshness evaluation, and bounded snippet reading
+- Retrieval guardrails: scan binding, tracked-file checks, `get_repo_freshness`-style freshness evaluation, and bounded snippet reading
 - Evidence-backed span access rules that keep detailed code reading constrained and reviewable
 
 New contract direction:
 - `evidence` owns `build_evidence_pack`, `read_evidence_pack`, and guarded `open_span`
 - The new contract should produce typed evidence-pack assets with stable IDs, citation records, freshness messages, and explicit read-boundary metadata
+- `get_repo_freshness` folds into `evidence` instead of surviving as a standalone MCP surface: freshness becomes supporting metadata and validation inside evidence-pack reads and guarded span access
 - Retrieval logic is preserved as evidence-domain enforcement, not as a separate user-facing legacy subsystem and not as a chat runtime concern
 
 ## impact
@@ -148,7 +151,7 @@ New contract direction:
 - `AskService` wraps slice planning, evidence building, and conservative answer summarization; preserve the underlying logic where it is still useful, but drop the top-level ask shell as a product surface.
 - The old runtime registry is a good source of tool boundaries and safety guardrails, especially around `plan_slice`, `expand_slice`, `read_evidence_pack`, and guarded `open_span`, but the new repository is not a chat runtime and should not inherit session orchestration as architecture.
 - Legacy CLI commands and demo exports can inform MCP tool naming, manifest shape, and export expectations, but they do not survive as compatibility surfaces.
-- Storage is a cross-cutting implementation concern rather than one of the eight domain sections in this mapping; reuse schema ideas only where they support the new scan, slice, evidence, report, and export asset contracts.
+- Storage is a cross-cutting implementation concern rather than one of the eight domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
 
 ## Explicit Non-Mappings
 
@@ -156,5 +159,6 @@ New contract direction:
 - `codewiki/indexing/service.py` and deprecated CLI aliases such as `index`, `analyze`, `export`, and `bundle` do not map forward; zero compatibility remains the rule.
 - `ask/service.py` and `answers/models.py` do not survive as a standalone domain; their useful logic decomposes into `slice`, `evidence`, `impact`, and future workflow/document layers.
 - `codewiki/retrieval/*` does not remain a separate public domain even though its logic survives; bounded-read and freshness enforcement fold into `evidence`.
+- `codewiki/storage/session_store.py`, `codewiki/storage/trace_store.py`, and old runtime telemetry/event persistence are not automatically mapped forward just because asset persistence survives; they require fresh justification in later phases.
 - Old runtime paths under `<repo>/.claude/codewiki/` do not map forward; runtime assets move to `<repo>/.codewiki/`.
 - Checked-in fixture repositories and synthetic fixture builders are not domain capabilities; they remain test-only baselines for later contract, integration, and golden validation.

@@ -144,6 +144,7 @@ Carry forward:
 New contract direction:
 - `export` is a new first-class domain for `export_analysis_bundle`, `export_scope_snapshot`, and `export_evidence_bundle`
 - The new contract should export typed, reusable analysis assets with stable IDs and manifest metadata rather than preserve old CLI commands or old bundle formats as compatibility commitments
+- The dropped legacy CLI `export` and `bundle` compatibility surfaces do not survive as product commands; that compatibility cleanup does not change the new `export` domain above
 - Legacy demo exports are useful as expectation seeds, but export is rebuilt around MCP-facing asset reuse and later workflow integration
 
 ## Cross-Domain Decomposition Notes

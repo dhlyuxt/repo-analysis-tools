@@ -84,7 +84,7 @@
 - The offline core is already separated into domain-ish packages: `scan`, `scope`, `anchors`, `slices`, `evidence`, `retrieval`, `impact`, and `reporting`, with `storage` acting as a cross-cutting support layer rather than a ninth analysis domain.
 - The test tree mirrors those surfaces with dedicated suites for `agent_runtime`, `ask`, `anchors`, `evidence`, `impact`, `retrieval`, `scan`, `scope`, `slices`, `storage`, `reporting`, CLI, and pipeline coverage.
 - The old runtime root is hard-coded to `<repo>/.claude/codewiki/index.db` via `codewiki/scan/models.py`, which conflicts with the new neutral `.codewiki/` runtime rule.
-- Tests already encode the intended scope-first golden path: build repo fixture, run scan, answer a locate-symbol question, compute impact, and export a report.
+- Tests already encode the intended scope-first legacy golden path: build repo fixture, run scan, answer a locate-symbol question, compute impact, and export a report.
 
 ## Capability Inventory
 
@@ -110,7 +110,7 @@
 
 - Synthetic baseline fixture:
   - `tests/fixtures/scope_first_repo.py` creates a minimal C repository with `src`, `ports`, `demo`, and `generated` directories.
-  - `tests/test_pipeline/test_scope_first_pipeline.py` proves the current golden path: `scan -> ask -> impact -> report`.
+  - `tests/test_pipeline/test_scope_first_pipeline.py` proves the current legacy golden path: `scan -> ask -> impact -> report`.
   - `rg -n "build_scope_first_repo" tests` shows broad reuse across storage, slices, retrieval, reporting, CLI, pipeline, and agent runtime suites, so this fixture is already the de facto regression backbone.
   - Reuse value: fast offline contract test for scope classification, anchor extraction, slice planning, and report output.
 - Real fixture baselines:

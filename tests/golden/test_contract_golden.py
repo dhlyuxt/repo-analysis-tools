@@ -1,5 +1,6 @@
 import unittest
 
+from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME
 from repo_analysis_tools.mcp.tools.shared import stub_payload
 from tests.golden.harness import assert_matches_fixture, load_fixture
 
@@ -11,7 +12,7 @@ class ContractGoldenTest(unittest.TestCase):
         payload = stub_payload(
             "scan_repo",
             target_repo="/tmp/demo-repo",
-            scan_id="scan_stub000001",
+            scan_id="scan_000000000001",
         )
 
         assert_matches_fixture(self, "scan_repo.json", payload)
@@ -21,5 +22,5 @@ class ContractGoldenTest(unittest.TestCase):
 
         self.assertEqual(
             set(fixture["data"]),
-            {"target_repo", "runtime_root", "scan_id"},
+            set(CONTRACT_BY_NAME["scan_repo"].output_schema),
         )

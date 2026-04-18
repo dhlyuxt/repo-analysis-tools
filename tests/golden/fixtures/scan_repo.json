@@ -1,7 +1,7 @@
 {
   "data": {
     "runtime_root": "/tmp/demo-repo/.codewiki",
-    "scan_id": "scan_stub000001",
+    "scan_id": "scan_000000000001",
     "target_repo": "/tmp/demo-repo"
   },
   "messages": [

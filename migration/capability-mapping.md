@@ -12,7 +12,7 @@ Old sources:
 
 Carry forward:
 - Deterministic repository scan logic, including filesystem traversal and git provenance capture
-- Persisted scan runs and latest-scan state, as long as storage moves under `<target_repo>/.codewiki/`
+- Persisted scan runs and latest-scan state, as long as ownership stays with the shared storage layer under `<target_repo>/.codewiki/`
 - Scan identifiers and freshness hooks that downstream domains can bind to
 
 New contract direction:
@@ -49,7 +49,7 @@ Old sources:
 Carry forward:
 - Deterministic extraction of definitions, declarations, relations, and augmented field-level anchor details
 - Local parser integration from `codewiki/infrastructure/treesitter/*` and the vendored analyzer family that can run offline against harvested repositories
-- Anchor persistence and lookup state stay traceable through `codewiki/anchors/storage.py`
+- Anchor persistence and lookup state stay traceable through `codewiki/anchors/storage.py`, but ownership belongs to the shared storage layer rather than the `anchors` domain row
 - Existing test-backed expectations for anchor lookup on the synthetic baseline fixture
 
 New contract direction:

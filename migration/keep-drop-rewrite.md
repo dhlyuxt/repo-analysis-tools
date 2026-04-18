@@ -54,7 +54,7 @@ This baseline is the final disposition/decision authority for M1. The matrix is 
 - `reporting` is not allowed to survive as a direct markdown writer with a fixed legacy path.
 - `agent_runtime`, `ask`, and `answers` are not preserved as top-level product surfaces; they remain reference implementations for logic harvesting where this matrix says `extract logic, rewrite shell`.
 - `.claude/codewiki/` is a dead runtime root for migration purposes; `.codewiki/` is the only valid direction.
-- Legacy CLI compatibility commands and wrapper names such as `index`, `analyze`, `export`, and `bundle` remain out of scope even if a shell is easy to keep; this refers to the dropped compatibility surface, not the approved new `export` domain in `migration/capability-mapping.md`.
+- Legacy CLI compatibility commands and wrapper names such as `index`, `analyze`, and the old CLI-facing `export`/`bundle` shells remain out of scope even if a shell is easy to keep; this does not override the explicit `export_bundle` / `run_scope_first_demo_export` harvest rows above.
 - Storage scope is closed for M1: keep repo/scan/slice/anchor persistence, and do not carry forward runtime session telemetry, session replay history, trace-event persistence, or any assumed old storage-backed report/export handles.
 - `tests/fixtures/scope_first_repo.py` should be the first contract gate for M1 acceptance because it is fast enough to guard every migration step.
 - `EasyFlash-master/` should be the first real-repo gate for parser, anchor, and impact validation once the core domains are wired.

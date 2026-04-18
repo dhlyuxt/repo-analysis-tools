@@ -96,7 +96,7 @@
 | Ask and answer flow | `ask/service.py`, `answers/models.py` | Scope-first Q&A contract built from slices/evidence/impact | workflow shell over `slice` + `evidence` + `impact` | extract logic, rewrite shell | Keep answer contract ideas, drop old CLI/chat framing. |
 | Core storage | `storage/repo_store.py`, `storage/slice_store.py`, `storage/migrations.py`, `scan/storage.py`, `anchors/storage.py` | SQLite-backed scan, slice, repo, and anchor persistence | cross-cutting storage support layer | migrate and reorganize | Keep durable scan/slice/repo/anchor persistence ideas, move runtime root to `.codewiki/`, and do not infer old report/export handle infrastructure from this layer. |
 | Runtime storage shells | `storage/session_store.py`, `storage/trace_store.py` | Session and trace persistence | none | drop | Runtime session/trace telemetry persistence does not carry forward by default. |
-| Compatibility layer | `indexing/service.py`, CLI `index/analyze/export/bundle` aliases | README deprecation note and indexing wrapper | none | drop | Compatibility commands must not survive. |
+| Compatibility layer | `indexing/service.py`, legacy CLI `index/analyze` aliases, and deprecated command wrappers | README deprecation note and indexing wrapper | none | drop | Compatibility command names must not survive; real export/bundle harvest logic is classified separately below. |
 | Fixtures | `tests/fixtures/scope_first_repo.py`, pipeline tests, real repo references | Synthetic repo builder plus EasyFlash references | fixtures / golden baselines | test-only baseline | Preserve for later contract and e2e validation. |
 
 ## Visible Capability Surfaces

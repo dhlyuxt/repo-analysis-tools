@@ -6,13 +6,13 @@ This document remaps the approved old-repository inventory into the new domain m
 
 Old sources:
 - `codewiki/scan/service.py`, `codewiki/scan/models.py`
-- `codewiki/storage/repo_store.py`, `codewiki/storage/migrations.py`
 - Runtime exposure via `codewiki/agent_runtime/tools/registry.py: scan_repo`
 - Pipeline and scan tests in `tests/test_scan/*`, `tests/test_pipeline/test_scope_first_pipeline.py`
 
 Carry forward:
 - Deterministic repository scan logic, including filesystem traversal and git provenance capture
 - Persisted scan runs and latest-scan state, as long as ownership stays with the shared storage layer under `<target_repo>/.codewiki/`
+- Scan persistence remains traceable through the shared storage layer, concretely `codewiki/scan/storage.py`, `codewiki/storage/repo_store.py`, and `codewiki/storage/migrations.py`
 - Scan identifiers and freshness hooks that downstream domains can bind to
 
 New contract direction:

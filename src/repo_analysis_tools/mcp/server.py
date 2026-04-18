@@ -1,7 +1,14 @@
 from repo_analysis_tools.mcp.app import mcp
 
 
+def _register_tools() -> None:
+    from repo_analysis_tools.mcp import tools as registered_tools
+
+    _ = registered_tools
+
+
 def create_server():
+    _register_tools()
     return mcp
 
 

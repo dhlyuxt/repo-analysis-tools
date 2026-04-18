@@ -151,7 +151,7 @@ New contract direction:
 - `AskService` wraps slice planning, evidence building, and conservative answer summarization; preserve the underlying logic where it is still useful, but drop the top-level ask shell as a product surface.
 - The old runtime registry is a good source of tool boundaries and safety guardrails, especially around `plan_slice`, `expand_slice`, `read_evidence_pack`, and guarded `open_span`, but the new repository is not a chat runtime and should not inherit session orchestration as architecture.
 - Legacy CLI commands and demo exports can inform MCP tool naming, manifest shape, and export expectations, but they do not survive as compatibility surfaces.
-- Storage is a cross-cutting implementation concern rather than one of the eight domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
+- Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
 
 ## Explicit Non-Mappings
 
@@ -165,5 +165,6 @@ New contract direction:
 
 ## Acceptance Handoff Note
 
-- Task 4 finalization: this document is the accepted domain-mapping source of truth for M1.
-- This fixes the eight-domain contract baseline: `scan`, `scope`, `anchors`, `slice`, `evidence`, `impact`, `report`, and `export`.
+- Task 4 finalization: this document owns the accepted mapping from inventoried legacy capabilities into the M1 eight-domain contract baseline.
+- This fixes the eight-domain contract baseline: `scan`, `scope`, `anchors`, `slice`, `evidence`, `impact`, `report`, and `export`, with `storage` treated as cross-cutting support rather than a ninth analysis domain.
+- If any final migration decision or handoff-precedence conflict appears across the three documents, `migration/keep-drop-rewrite.md` is the synthesis authority for M1.

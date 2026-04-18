@@ -29,8 +29,8 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 | `codewiki/retrieval/*` | extract logic, rewrite shell | Retrieval guardrails are valuable, but capability mapping folds them into `evidence` instead of preserving a standalone public subsystem. | Keep freshness, tracked-file checks, and bounded snippet reads as evidence-domain enforcement only. |
 | `codewiki/reporting/service.py` | extract logic, rewrite shell | Reporting starts from durable evidence facts, but the old markdown-writing shell and fixed output path do not survive. | Rebuild as typed report skeleton generation that can feed the future document pipeline. |
 | `tests/fixtures/scope_first_repo.py` | test-only baseline | Approved inventory names it as the de facto regression backbone across scan/scope/slice/evidence/reporting/runtime tests. | Preserve as a contract fixture and migration acceptance seed, not product code. |
-| `EasyFlash-master/` | test-only baseline | Inventory identifies it as a real fixture candidate for later end-to-end repo-understanding validation. | Keep only as a repo-understanding baseline candidate. |
-| `builds/easyflash-e2e-clean/easyflash/` | test-only baseline | Inventory identifies the clean EasyFlash tree as a checked-in real fixture candidate tied to existing demo/export evidence. | Use for later end-to-end and export validation; do not treat as shipped product content. |
+| `EasyFlash-master/` | test-only baseline | Inventory identifies it as the accepted primary real-fixture baseline for M1 repo-understanding validation. | Keep as the primary accepted real-fixture baseline. |
+| `builds/easyflash-e2e-clean/easyflash/` | test-only baseline | Inventory identifies the clean EasyFlash tree as an optional secondary regression snapshot tied to existing demo/export evidence. | Use for optional end-to-end and export regression validation; do not treat as shipped product content. |
 | `codewiki/agent_runtime/*` | extract logic, rewrite shell | Tool boundaries and guarded read behavior are useful, but orchestration, session shells, and chat runtime architecture must not survive intact. | Preserve selected tool contracts and safety gates only; replace the runtime shell wholesale. |
 | `codewiki/ask/*` and `codewiki/answers/*` | extract logic, rewrite shell | The useful part is the decomposition into slice, evidence, and conservative answer structure; the top-level ask product surface is explicitly non-mapped. | Keep answer-contract ideas where they inform typed result shapes, but do not preserve `ask` as a mega-surface. |
 | `codewiki/cli/*` plus related `codewiki/demo/*` and `codewiki/benchmarks/*` shells | drop | CLI compatibility commands, bundle/demo export shells, and benchmark harnesses do not map forward as product surfaces. | Keep only any golden expectations indirectly through fixtures/tests; no CLI compatibility or demo-first shell survives. |
@@ -38,8 +38,8 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 ## Fixture Nominations
 
 - `tests/fixtures/scope_first_repo.py` anchors fast acceptance for `scan`, `scope`, `anchors`, `slice`, and `evidence` contracts, including the scope-first golden path already exercised by `tests/test_pipeline/test_scope_first_pipeline.py`.
-- `builds/easyflash-e2e-clean/easyflash/` anchors later real-repo acceptance for `scan`, `anchors`, and `impact`, plus rewritten report/export comparisons against the checked-in artifact set under `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`.
-- `EasyFlash-master/` anchors a second real-repo validation lane for repo-understanding and impact scenarios when M1 or later needs coverage outside the normalized clean build tree.
+- `EasyFlash-master/` anchors the primary real-repo acceptance lane for repo-understanding and impact scenarios in M1.
+- `builds/easyflash-e2e-clean/easyflash/` remains an optional secondary regression snapshot for rewritten report/export comparisons against the checked-in artifact set under `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`.
 - Legacy shell outputs are baseline-only comparison artifacts, specifically `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`, and the demo/export expectations exercised by `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`.
 
 ## Notes for M1
@@ -52,7 +52,8 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 - Compatibility commands and wrapper names such as `index`, `analyze`, `export`, and `bundle` remain out of scope even if a shell is easy to keep.
 - Storage scope is closed for M1: keep asset persistence, scan state, and stable slice/evidence handles; do not carry forward runtime session telemetry, session replay history, or trace-event persistence by default.
 - `tests/fixtures/scope_first_repo.py` should be the first contract gate for M1 acceptance because it is fast enough to guard every migration step.
-- `builds/easyflash-e2e-clean/easyflash/` should be the first real-repo gate for parser, anchor, impact, and report-shape validation once the core domains are wired.
+- `EasyFlash-master/` should be the first real-repo gate for parser, anchor, and impact validation once the core domains are wired.
+- `builds/easyflash-e2e-clean/easyflash/` remains optional as a secondary regression snapshot for report/export comparison checks.
 - `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md` should be treated as named comparison artifacts when rewritten report/export behavior is checked.
 
 ## High-Risk Rationale

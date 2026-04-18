@@ -33,6 +33,11 @@
   - `codewiki/reporting/service.py`
   - `codewiki/ask/service.py`
   - `codewiki/answers/models.py`
+  - `codewiki/infrastructure/treesitter/*`
+  - `codewiki/vendor/fsoft_codewiki/*`
+  - `codewiki/cli/main.py`
+  - `codewiki/demo/*`
+  - `codewiki/benchmarks/*`
   - `codewiki/indexing/service.py`
   - `codewiki/storage/repo_store.py`
   - `codewiki/storage/slice_store.py`
@@ -104,7 +109,7 @@
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | scan core | `codewiki/scan/service.py`, `codewiki/scan/storage.py`, `codewiki/scan/models.py` | `ScanService.scan`, `ScanStorage.record_scan`, `ScanPaths.for_repo` | `tests/test_scan/test_service.py`, `tests/test_scan/test_storage.py`, `tests/test_pipeline/test_scope_first_pipeline.py` | Yes; filesystem + git provenance only | `scan` | migrate and reorganize | Builds repo-local scan state, persists scan runs, triggers scope and anchor extraction. |
 | scope core | `codewiki/scope/service.py`, `codewiki/scope/config.py` | `ScopeService.for_repo`, `ScopeService.classify` | `tests/test_scope/test_service.py`, `tests/test_scope/test_config.py`, `tests/test_cli/test_main.py` | Yes | `scope` | migrate and reorganize | Classifies files into primary/support/external/generated/ignored roles using path and config heuristics. |
-| anchor extraction | `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`, vendored analyzer under `codewiki/vendor/fsoft_codewiki` | `AnchorService.for_repo`, `AnchorService.extract_for_paths` | `tests/test_anchors/test_service.py`, `tests/test_anchors/test_storage.py`, `tests/test_pipeline/test_scope_first_pipeline.py` | Yes, assuming local parser assets | `anchors` | migrate and reorganize | Extracts definitions plus relation anchors and augments them with raw field declarations. |
+| anchor extraction | `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`, parser substrate under `codewiki/infrastructure/treesitter/*`, vendored analyzer under `codewiki/vendor/fsoft_codewiki/*` | `AnchorService.for_repo`, `AnchorService.extract_for_paths` | `tests/test_anchors/test_service.py`, `tests/test_anchors/test_storage.py`, `tests/test_pipeline/test_scope_first_pipeline.py` | Yes, using local parser substrate plus vendored offline analyzer assets | `anchors` | migrate and reorganize | Extracts definitions plus relation anchors and augments them with raw field declarations. |
 | slice planning | `codewiki/slices/planner.py`, `codewiki/slices/seed_resolver_v2.py`, `codewiki/slices/classifier_v2.py`, `codewiki/slices/expansion/*` | `SlicePlanner.plan`, `SlicePlanner.plan_for_change_impact`, `SlicePlanner.expand_manifest` | `tests/test_slices/test_planner.py`, `tests/test_slices/test_expansion_recipes.py`, `tests/test_agent_runtime/test_expand_slice_tool.py` | Yes | `slice` | migrate and reorganize | Converts questions or changed paths into bounded manifests of files, spans, notes, and expansion budgets. |
 | evidence builder | `codewiki/evidence/builder.py`, `codewiki/evidence/citations.py`, `codewiki/evidence/models.py` | `ContextPackBuilder.build` | `tests/test_evidence/test_builder.py`, `tests/test_reporting/test_service.py`, `tests/test_pipeline/test_scope_first_pipeline.py` | Yes | `evidence` | migrate and reorganize | Turns slice manifests into structured context packs with citations, relations, freshness, and missing slots. |
 | retrieval guards | `codewiki/retrieval/service.py`, `codewiki/retrieval/freshness.py`, `codewiki/retrieval/snippets.py` | `RetrievalService.build_evidence_pack`, `evaluate_retrieval_freshness`, `read_snippet` | `tests/test_retrieval/test_service.py`, `tests/test_retrieval/test_freshness.py`, `tests/test_agent_runtime/test_registry.py` | Yes | `evidence` | extract logic, rewrite shell | Enforces scan binding, git freshness, tracked-file checks, and bounded snippet materialization as evidence-domain logic, not a standalone retrieval surface. |

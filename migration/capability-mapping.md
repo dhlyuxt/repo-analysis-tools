@@ -136,7 +136,6 @@ Old sources:
 - `codewiki/cli/bundle.py`, `codewiki/demo/export.py`
 - Legacy CLI compatibility surfaces in `codewiki/cli/main.py` and `codewiki/indexing/service.py` for `export` and `bundle`
 - Example outputs and manifests under `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/`, and `builds/easyflash-e2e-demo/`
-- Storage-layer context from `codewiki/storage/repo_store.py`, `codewiki/storage/slice_store.py`, and `codewiki/storage/migrations.py`
 - Export-oriented tests in `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`
 
 Carry forward:

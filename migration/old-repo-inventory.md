@@ -149,7 +149,8 @@
 - Example runtime outputs worth preserving only as baselines:
   - repo-local scan database under `.claude/codewiki/index.db`
   - `docs/codewiki/focus-report.md` report shell output
-  - slice/evidence/session tables in SQLite for later migration comparison
+  - slice/evidence tables in SQLite for later migration comparison
+  - session/trace tables only as dropped-runtime reference material, not as accepted M1 persistence scope
 
 ## Legacy Assumptions That Must Not Survive
 

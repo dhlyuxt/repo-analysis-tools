@@ -1,0 +1,16 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "repo-analysis-tools"
+version = "0.1.0"
+description = "MCP-first repository analysis platform"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mcp[cli]>=1.0,<2.0",
+]
+
+[project.scripts]
+repo-analysis-mcp = "repo_analysis_tools.mcp.server:main"

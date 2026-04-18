@@ -1,3 +1,4 @@
+import re
 import unittest
 from pathlib import Path
 
@@ -27,6 +28,7 @@ EXPECTED_ARCHITECTURE_BOUNDARIES = {
     "doc_specs",
     "doc_dsl",
     "renderers",
+    "tests",
 }
 
 EXPECTED_ID_LABELS = {
@@ -39,9 +41,47 @@ EXPECTED_ID_LABELS = {
 
 
 class ArchitectureDocsTest(unittest.TestCase):
+    maxDiff = None
+
     def read_text(self, path: Path) -> str:
         self.assertTrue(path.exists(), f"missing documentation file: {path.relative_to(REPO_ROOT)}")
         return path.read_text(encoding="utf-8")
+
+    def section_text(self, document: str, heading: str) -> str:
+        pattern = re.compile(
+            rf"^## {re.escape(heading)}\n(?P<body>.*?)(?=^## |\Z)",
+            re.MULTILINE | re.DOTALL,
+        )
+        match = pattern.search(document)
+        self.assertIsNotNone(match, f"missing section: {heading}")
+        return match.group("body")
+
+    def parse_markdown_row(self, line: str) -> list[str]:
+        self.assertTrue(line.startswith("|"), f"not a markdown table row: {line}")
+        return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+    def parse_markdown_table(self, section: str) -> tuple[list[str], list[dict[str, str]]]:
+        table_lines: list[str] = []
+        for line in section.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("|"):
+                table_lines.append(stripped)
+            elif table_lines:
+                break
+
+        self.assertGreaterEqual(len(table_lines), 3, "expected a markdown table with header and rows")
+
+        header = self.parse_markdown_row(table_lines[0])
+        separator = self.parse_markdown_row(table_lines[1])
+        self.assertEqual(len(header), len(separator), "table separator width drifted from header width")
+
+        rows = [dict(zip(header, self.parse_markdown_row(line), strict=True)) for line in table_lines[2:]]
+        return header, rows
+
+    def parse_backticked_values(self, cell: str) -> list[str]:
+        if cell.strip() == "none":
+            return []
+        return re.findall(r"`([^`]+)`", cell)
 
     def test_architecture_doc_records_m1_boundaries_runtime_and_errors(self) -> None:
         document = self.read_text(ARCHITECTURE_DOC)
@@ -75,13 +115,49 @@ class ArchitectureDocsTest(unittest.TestCase):
             self.assertIn(f"`{error_code.value}`", document, error_code.value)
 
         for domain_name, contracts in DOMAIN_CONTRACTS.items():
-            self.assertIn(f"## `{domain_name}`", document, domain_name)
+            section = self.section_text(document, f"`{domain_name}`")
+            header, rows = self.parse_markdown_table(section)
+            self.assertEqual(
+                header,
+                ["Tool", "Inputs", "Outputs", "Stable IDs", "Failure modes", "Next tools"],
+                domain_name,
+            )
+
+            row_by_tool = {}
+            for row in rows:
+                tool_names = self.parse_backticked_values(row["Tool"])
+                self.assertEqual(len(tool_names), 1, row)
+                row_by_tool[tool_names[0]] = row
+
+            self.assertEqual(set(row_by_tool), {contract.name for contract in contracts}, domain_name)
+
             for contract in contracts:
-                self.assertIn(f"`{contract.name}`", document, contract.name)
-                for field_name in contract.input_schema:
-                    self.assertIn(f"`{field_name}`", document, f"{contract.name}:{field_name}")
-                for field_name in contract.output_schema:
-                    self.assertIn(f"`{field_name}`", document, f"{contract.name}:{field_name}")
+                row = row_by_tool[contract.name]
+                self.assertEqual(
+                    self.parse_backticked_values(row["Inputs"]),
+                    list(contract.input_schema),
+                    f"{domain_name}:{contract.name}:inputs",
+                )
+                self.assertEqual(
+                    self.parse_backticked_values(row["Outputs"]),
+                    list(contract.output_schema),
+                    f"{domain_name}:{contract.name}:outputs",
+                )
+                self.assertEqual(
+                    self.parse_backticked_values(row["Stable IDs"]),
+                    [stable_id.value for stable_id in contract.stable_ids],
+                    f"{domain_name}:{contract.name}:stable_ids",
+                )
+                self.assertEqual(
+                    self.parse_backticked_values(row["Failure modes"]),
+                    [failure_mode.value for failure_mode in contract.failure_modes],
+                    f"{domain_name}:{contract.name}:failure_modes",
+                )
+                self.assertEqual(
+                    self.parse_backticked_values(row["Next tools"]),
+                    list(contract.recommended_next_tools),
+                    f"{domain_name}:{contract.name}:recommended_next_tools",
+                )
 
     def test_contract_doc_mentions_every_declared_stable_id_family(self) -> None:
         document = self.read_text(CONTRACT_DOC)

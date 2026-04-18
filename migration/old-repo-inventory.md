@@ -135,3 +135,8 @@
 - Report generation should not stay as an ad hoc markdown shell without the new typed document spec / DSL / renderer pipeline.
 - Retrieval must keep bounded-read and freshness enforcement, but those guards belong in domain MCP tools, not inside a legacy chat runtime.
 - Vendored or parser-heavy anchor extraction can survive only as harvested deterministic logic; old package boundaries and old repository layout must not be copied forward.
+
+## Acceptance Handoff Note
+
+- Task 4 finalization: this document is the accepted inventory source of truth for M1.
+- M1 should consume this inventory together with `migration/capability-mapping.md` and `migration/keep-drop-rewrite.md`.

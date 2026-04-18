@@ -162,3 +162,8 @@ New contract direction:
 - `codewiki/storage/session_store.py`, `codewiki/storage/trace_store.py`, and old runtime telemetry/event persistence are not automatically mapped forward just because asset persistence survives; they require fresh justification in later phases.
 - Old runtime paths under `<repo>/.claude/codewiki/` do not map forward; runtime assets move to `<repo>/.codewiki/`.
 - Checked-in fixture repositories and synthetic fixture builders are not domain capabilities; they remain test-only baselines for later contract, integration, and golden validation.
+
+## Acceptance Handoff Note
+
+- Task 4 finalization: this document is the accepted domain-mapping source of truth for M1.
+- This fixes the eight-domain contract baseline: `scan`, `scope`, `anchors`, `slice`, `evidence`, `impact`, `report`, and `export`.

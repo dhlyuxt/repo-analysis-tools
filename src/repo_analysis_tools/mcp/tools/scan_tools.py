@@ -14,9 +14,10 @@ def refresh_scan(target_repo: str, scan_id: str) -> dict[str, object]:
 
 @mcp.tool()
 def get_scan_status(target_repo: str, scan_id: str | None = None) -> dict[str, object]:
+    extra = {"scan_id": scan_id} if scan_id is not None else {}
     return stub_payload(
         "get_scan_status",
         target_repo=target_repo,
-        scan_id=scan_id or "scan_stub_status",
         status_detail="stub",
+        **extra,
     )

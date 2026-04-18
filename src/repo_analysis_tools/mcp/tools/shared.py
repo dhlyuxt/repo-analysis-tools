@@ -26,7 +26,6 @@ def stub_payload(tool_name: str, *, target_repo: str, **extra: Any) -> dict[str,
     for kind in contract.stable_ids:
         field_name = ID_FIELDS[kind]
         payload.setdefault(field_name, make_stable_id(kind))
-    payload.setdefault("contract_version", "m1")
     return ok_response(
         data=payload,
         messages=[f"{tool_name} is an M1 contract stub."],

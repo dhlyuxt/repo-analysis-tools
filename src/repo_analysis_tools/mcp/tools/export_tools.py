@@ -9,7 +9,8 @@ def export_analysis_bundle(target_repo: str, report_id: str) -> dict[str, object
 
 @mcp.tool()
 def export_scope_snapshot(target_repo: str, scan_id: str | None = None) -> dict[str, object]:
-    return stub_payload("export_scope_snapshot", target_repo=target_repo, scan_id=scan_id or "scan_stub_export")
+    extra = {"scan_id": scan_id} if scan_id is not None else {}
+    return stub_payload("export_scope_snapshot", target_repo=target_repo, **extra)
 
 
 @mcp.tool()

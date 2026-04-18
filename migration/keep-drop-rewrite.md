@@ -1,15 +1,15 @@
 # Keep, Drop, Rewrite
 
-This baseline is the final disposition/decision authority for M1. The matrix is package-family oriented, single-class only, and uses the approved M0 documents as the source of truth. `docs/gpt5.4proreview.md` is used only to sharpen rewrite/drop rationale where the inventory and mapping already point the same way.
+This baseline is the final disposition/decision authority for M1. The matrix is package/surface oriented, single-class only, and uses the approved M0 documents as the source of truth. A package file row and a method-qualified surface row may both appear when a legacy file intentionally splits report/export responsibilities across distinct surfaces. `docs/gpt5.4proreview.md` is used only to sharpen rewrite/drop rationale where the inventory and mapping already point the same way.
 
 ## Decision Rules
 
-1. Every major legacy family or baseline asset that gets a matrix row appears exactly once in the matrix and is assigned exactly one class.
+1. Every major legacy family or baseline asset that gets a matrix row appears exactly once in the matrix and is assigned exactly one class. A file-level row and a method-level row may coexist when the same file has deliberately split surfaces.
 2. `migrate and reorganize` means the deterministic offline capability survives, but package boundaries, runtime paths, and storage layout may move to fit the new repo.
 3. `extract logic, rewrite shell` means some durable logic or contracts survive, but the old top-level surface, orchestration shell, or output contract must not be carried forward intact.
 4. `test-only baseline` means preserve as fixture, golden reference, or migration acceptance input only; it is not product code.
 5. `drop` means no forward product surface, no compatibility promise, and no package-level migration beyond optional reference reading during rewrites.
-6. When a family overlaps another concern, the matrix assigns ownership once and the notes column states the boundary to avoid double-classification.
+6. When a family overlaps another concern, the matrix assigns ownership once and the notes column states the boundary to avoid double-classification. If a file contains a distinct method surface, the method row can carry that boundary explicitly instead of folding it back into the package row.
 7. Inventory and mapping are the evidence baselines, but this document resolves final disposition: no row may keep a compatibility alias, chat shell, or old runtime path just because it already exists.
 
 ## Disposition Matrix

@@ -152,13 +152,14 @@ New contract direction:
 - The old runtime registry is a good source of tool boundaries and safety guardrails, especially around `plan_slice`, `expand_slice`, `read_evidence_pack`, and guarded `open_span`, but the new repository is not a chat runtime and should not inherit session orchestration as architecture.
 - Legacy CLI commands and demo exports can inform MCP tool naming, manifest shape, and export expectations, but they do not survive as compatibility surfaces.
 - Storage is a cross-cutting support layer/package rather than one of the eight analysis domain sections in this mapping; asset-oriented persistence for scans, slices, evidence packs, reports, exports, and stable handles survives as durable support, while runtime/session/telemetry persistence from the old runtime shell is not automatically carried forward.
+- `agent_runtime`, `ask`, and `answers` are not preserved as top-level product surfaces; only the logic that the matrix and explicit non-mappings retain may be harvested into new MCP/domain contracts.
 
 ## Explicit Non-Mappings
 
-- `codewiki/agent_runtime/orchestrator.py` and `codewiki/agent_runtime/session_manager.py` do not map to a new product domain; only selected guarded tool-boundary behavior informs MCP contracts.
+- `codewiki/agent_runtime/orchestrator.py` and `codewiki/agent_runtime/session_manager.py` do not map to a new product domain or top-level product surface; only selected guarded tool-boundary behavior informs MCP contracts.
 - `codewiki/indexing/service.py` and deprecated CLI aliases such as `index`, `analyze`, `export`, and `bundle` do not map forward; zero compatibility remains the rule.
-- `ask/service.py` and `answers/models.py` do not survive as a standalone domain; their useful logic decomposes into `slice`, `evidence`, `impact`, and future workflow/document layers.
-- `codewiki/retrieval/*` does not remain a separate public domain even though its logic survives; bounded-read and freshness enforcement fold into `evidence`.
+- `ask/service.py` and `answers/models.py` do not survive as a standalone domain or top-level product surface; their useful logic decomposes into `slice`, `evidence`, `impact`, and future workflow/document layers.
+- `codewiki/retrieval/*` does not remain a separate public domain or top-level product surface even though its logic survives; bounded-read and freshness enforcement fold into `evidence`.
 - `codewiki/storage/session_store.py`, `codewiki/storage/trace_store.py`, and old runtime telemetry/event persistence are not automatically mapped forward just because asset persistence survives; they require fresh justification in later phases.
 - Old runtime paths under `<repo>/.claude/codewiki/` do not map forward; runtime assets move to `<repo>/.codewiki/`.
 - Checked-in fixture repositories and synthetic fixture builders are not domain capabilities; they remain test-only baselines for later contract, integration, and golden validation.
@@ -167,4 +168,6 @@ New contract direction:
 
 - Task 4 finalization: this document owns the accepted mapping from inventoried legacy capabilities into the M1 eight-domain contract baseline.
 - This fixes the eight-domain contract baseline: `scan`, `scope`, `anchors`, `slice`, `evidence`, `impact`, `report`, and `export`, with `storage` treated as cross-cutting support rather than a ninth analysis domain.
-- If any final migration decision or handoff-precedence conflict appears across the three documents, `migration/keep-drop-rewrite.md` is the synthesis authority for M1.
+- `migration/capability-mapping.md` is the domain-mapping baseline for M1.
+- `migration/old-repo-inventory.md` is the evidence/inventory baseline for M1.
+- If any final migration decision or handoff-precedence conflict appears across the three documents, `migration/keep-drop-rewrite.md` is the final disposition/decision authority for M1.

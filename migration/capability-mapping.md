@@ -5,7 +5,7 @@ This document remaps the approved old-repository inventory into the new domain m
 ## scan
 
 Old sources:
-- `codewiki/scan/service.py`, `codewiki/scan/storage.py`, `codewiki/scan/models.py`
+- `codewiki/scan/service.py`, `codewiki/scan/models.py`
 - `codewiki/storage/repo_store.py`, `codewiki/storage/migrations.py`
 - Runtime exposure via `codewiki/agent_runtime/tools/registry.py: scan_repo`
 - Pipeline and scan tests in `tests/test_scan/*`, `tests/test_pipeline/test_scope_first_pipeline.py`
@@ -41,7 +41,7 @@ New contract direction:
 ## anchors
 
 Old sources:
-- `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`, `codewiki/anchors/storage.py`
+- `codewiki/anchors/service.py`, `codewiki/anchors/adapter.py`
 - Parser substrate under `codewiki/infrastructure/treesitter/*`
 - Vendored analyzer code under `codewiki/vendor/fsoft_codewiki`
 - Anchor tests and pipeline coverage in `tests/test_anchors/*`, `tests/test_pipeline/test_scope_first_pipeline.py`

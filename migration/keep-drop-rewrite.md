@@ -62,3 +62,18 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 - `codewiki/retrieval/*` is a rewrite rather than a keep because bounded reads and freshness checks are important, but the old package is organized like a separate subsystem. M1 should absorb those checks into `evidence` so scan binding and guarded snippet access stay mandatory without preserving a legacy public seam.
 - `codewiki/reporting/service.py` is a rewrite rather than a keep because the durable value is the report skeleton assembled from evidence, not the old markdown shell or fixed destination under `docs/codewiki/`. Rewriting now prevents M1 from inheriting an output contract that conflicts with the future typed document pipeline.
 - `codewiki/cli/*` plus related demo and benchmark shells are a drop because their main value is transitional wrapper behavior and experiment harnessing. Keeping them would reintroduce compatibility pressure and shell-shaped workflow assumptions that the approved mapping explicitly rejects.
+
+## M1 Handoff Baseline
+
+- Accepted inventory source of truth: `migration/old-repo-inventory.md`
+- Accepted domain mapping source of truth: `migration/capability-mapping.md`
+- Accepted disposition source of truth: `migration/keep-drop-rewrite.md`
+- Accepted real-repo fixture baseline: `d:/workspace/python/aiagent/mycodewiki/EasyFlash-master`
+- Accepted synthetic baseline fixture: `d:/workspace/python/aiagent/mycodewiki/tests/fixtures/scope_first_repo.py`
+- Optional regression snapshot: `d:/workspace/python/aiagent/mycodewiki/builds/easyflash-e2e-clean/easyflash`
+- Explicit non-goals handed to M1:
+  - legacy CLI compatibility
+  - `agent_runtime`
+  - `ask`
+  - `answers`
+  - the `.claude/codewiki/` runtime layout

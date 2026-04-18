@@ -1,5 +1,4 @@
 from repo_analysis_tools.mcp.app import mcp
-from repo_analysis_tools.mcp import tools as registered_tools
 
 
 def create_server():
@@ -7,6 +6,8 @@ def create_server():
 
 
 def main() -> None:
+    from repo_analysis_tools.mcp import tools as registered_tools
+
     _ = registered_tools
     create_server().run(transport="stdio")
 

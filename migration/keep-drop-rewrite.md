@@ -27,8 +27,9 @@ This baseline is the final disposition/decision authority for M1. The matrix is 
 | `codewiki/storage/*` plus related `codewiki/scan/storage.py` and anchor/scan persistence surfaces | migrate and reorganize | Storage is durable cross-cutting infrastructure for scan state, asset persistence, and stable handles that survive across scan, slice, evidence, report, and export. Why this keep is safe: the durable part is the asset store and latest-state model, not the runtime telemetry shell. | Rebuild schema/layout under `.codewiki/`; keep scan state, repo asset persistence, and stable slice/evidence/report/export handles now; exclude runtime session telemetry, session replay logs, and trace-event history from M1 by default. |
 | `codewiki/indexing/service.py` | drop | Inventory and mapping both classify indexing as a compatibility wrapper with no new-domain destination. | No `index` compatibility surface survives M1. |
 | `codewiki/retrieval/*` | extract logic, rewrite shell | Retrieval guardrails are valuable, but capability mapping folds them into `evidence` instead of preserving a standalone public subsystem. | Keep freshness, tracked-file checks, and bounded snippet reads as evidence-domain enforcement only. |
-| `codewiki/reporting/service.py` | extract logic, rewrite shell | Reporting starts from durable evidence facts, but the old markdown-writing shell and fixed output path do not survive. | Rebuild `render_focus_report` as typed report skeleton generation that can feed the future document pipeline; export-oriented behavior is handled separately below. |
-| `codewiki/reporting/service.py::ReportingService.export` | extract logic, rewrite shell | Capability mapping treats `ReportingService.export` as the legacy source for the new `export` domain, not report generation. | Harvest export-oriented packaging separately from `render_focus_report`; do not keep report as the owner of export behavior. |
+| `codewiki/reporting/service.py` | extract logic, rewrite shell | Reporting starts from durable evidence facts, but the old markdown-writing shell and fixed output path do not survive. | Rebuild `render_focus_report` as typed report skeleton generation that can feed the future document pipeline; `ReportingService.export` stays with the report-shell writer path, not the export domain. |
+| `codewiki/cli/bundle.py::export_bundle` | extract logic, rewrite shell | The bundle export pipeline is a real legacy export surface, separate from reporting. | Harvest the bundle packaging logic as the export-domain seed; do not reclassify it as report behavior. |
+| `codewiki/demo/export.py::run_scope_first_demo_export` | extract logic, rewrite shell | The demo export pipeline is the other real legacy export surface, separate from reporting. | Harvest the demo packaging logic as the export-domain seed; keep it distinct from the report shell. |
 | `tests/fixtures/scope_first_repo.py` | test-only baseline | Approved inventory names it as the de facto regression backbone across scan/scope/slice/evidence/reporting/runtime tests. | Preserve as a contract fixture and migration acceptance seed, not product code. |
 | `EasyFlash-master/` | test-only baseline | Inventory identifies it as the accepted primary real-fixture baseline for M1 repo-understanding validation. | Keep as the primary accepted real-fixture baseline. |
 | `builds/easyflash-e2e-clean` | test-only baseline | Inventory identifies the clean EasyFlash tree as an optional secondary regression snapshot tied to existing demo/export evidence. | Use for optional end-to-end and export regression validation; do not treat as shipped product content. |
@@ -42,7 +43,7 @@ This baseline is the final disposition/decision authority for M1. The matrix is 
 - `EasyFlash-master/` anchors the primary real-repo acceptance lane for repo-understanding and impact scenarios in M1.
 - `builds/easyflash-e2e-clean` remains an optional secondary regression snapshot for rewritten report/export comparisons against the checked-in artifact set under `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`.
 - `builds/easyflash-e2e-demo/` is reference-only comparison material and is not part of the accepted M1 fixture baseline.
-- Legacy shell outputs are baseline-only comparison artifacts, specifically `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`, and the demo/export expectations exercised by `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`.
+- Legacy shell outputs are baseline-only comparison artifacts, specifically `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`, and the synthetic bundle/demo expectations exercised by `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`.
 
 ## Notes for M1
 
@@ -58,7 +59,7 @@ This baseline is the final disposition/decision authority for M1. The matrix is 
 - `builds/easyflash-e2e-clean` remains optional as a secondary regression snapshot for report/export comparison checks.
 - `builds/easyflash-e2e-demo/` is comparison-only reference material, not part of the accepted M1 fixture baseline.
 - `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md` should be treated as named comparison artifacts when rewritten report/export behavior is checked.
-- Legacy export behavior belongs to the new `export` domain, not `report`; `ReportingService.export` is the harvest source for that boundary.
+- Legacy export behavior belongs to the new `export` domain, not `report`; `codewiki/cli/bundle.py::export_bundle` and `codewiki/demo/export.py::run_scope_first_demo_export` are the harvest sources for that boundary.
 
 ## High-Risk Rationale
 

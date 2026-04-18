@@ -126,28 +126,29 @@ Carry forward:
 New contract direction:
 - `report` owns structured report skeleton generation such as `render_focus_report`, `render_module_summary`, and `render_analysis_outline`
 - The new contract should return typed report assets or document-ready skeletons that the future document spec / DSL / renderer pipeline can validate and render
-- Legacy export-oriented behavior does not belong to `report`; `ReportingService.export` is the historical seed for the new `export` domain instead
+- `ReportingService.export` stays with the legacy report-shell writer path, not the new `export` domain
 - Legacy markdown-writing shells and fixed output paths do not survive as compatibility surfaces; report is an upstream structured-facts producer, not the final document system by itself
 
 ## export
 
 Old sources:
-- `ReportingService.export`
+- `codewiki/cli/bundle.py`, `codewiki/demo/export.py`
 - Legacy CLI compatibility surfaces in `codewiki/cli/main.py` and `codewiki/indexing/service.py` for `export` and `bundle`
 - Example outputs and manifests under `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/`, and `builds/easyflash-e2e-demo/`
 - Storage-layer asset concepts in `codewiki/storage/*`
+- Export-oriented tests in `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`
 
 Carry forward:
 - The idea that analysis assets can be packaged for later reuse, comparison, review, or transport
 - Manifest-style metadata from demo artifacts that can inform bundle shape and completeness checks
-- Legacy export-oriented behavior from `ReportingService.export` is the historical seed for the new `export` domain, not for report generation
+- Legacy export-oriented behavior from `codewiki/cli/bundle.py` and `codewiki/demo/export.py` is the historical seed for the new `export` domain, not for report generation
 - Storage-backed handles that make exported artifacts refer to stable scans, slices, evidence packs, and reports instead of anonymous files
 
 New contract direction:
 - `export` is a new first-class domain for `export_analysis_bundle`, `export_scope_snapshot`, and `export_evidence_bundle`
 - The new contract should export typed, reusable analysis assets with stable IDs and manifest metadata rather than preserve old CLI commands or old bundle formats as compatibility commitments
 - The dropped legacy CLI `export` and `bundle` compatibility surfaces do not survive as product commands; that compatibility cleanup does not change the new `export` domain above
-- Legacy demo exports are useful as expectation seeds, but export is rebuilt around MCP-facing asset reuse and later workflow integration
+- Legacy bundle/demo export behavior is useful as expectation seeds, but export is rebuilt around MCP-facing asset reuse and later workflow integration
 
 ## Cross-Domain Decomposition Notes
 

@@ -7,7 +7,6 @@ def plan_slice(target_repo: str, question: str) -> dict[str, object]:
     return stub_payload(
         "plan_slice",
         target_repo=target_repo,
-        question=question,
         seed_summary="M1 slice planning stub",
     )
 

@@ -8,7 +8,6 @@ def impact_from_paths(target_repo: str, paths: list[str], scan_id: str | None = 
     return stub_payload(
         "impact_from_paths",
         target_repo=target_repo,
-        paths=paths,
         impact_summary="M1 path impact stub",
         **extra,
     )
@@ -20,7 +19,6 @@ def impact_from_anchor(target_repo: str, anchor_name: str, scan_id: str | None =
     return stub_payload(
         "impact_from_anchor",
         target_repo=target_repo,
-        anchor_name=anchor_name,
         impact_summary="M1 anchor impact stub",
         **extra,
     )
@@ -32,7 +30,6 @@ def summarize_impact(target_repo: str, focus: str, scan_id: str | None = None) -
     return stub_payload(
         "summarize_impact",
         target_repo=target_repo,
-        focus=focus,
         risks=["M1 stub risk"],
         **extra,
     )

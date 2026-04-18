@@ -24,7 +24,5 @@ def open_span(target_repo: str, evidence_pack_id: str, path: str, line_start: in
         target_repo=target_repo,
         evidence_pack_id=evidence_pack_id,
         path=path,
-        line_start=line_start,
-        line_end=line_end,
         lines=["/* M1 span stub */"],
     )

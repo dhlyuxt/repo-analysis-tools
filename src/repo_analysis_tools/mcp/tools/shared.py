@@ -1,0 +1,34 @@
+from pathlib import Path
+from typing import Any
+
+from repo_analysis_tools.core.errors import ok_response
+from repo_analysis_tools.core.ids import StableIdKind, make_stable_id
+from repo_analysis_tools.core.paths import runtime_root
+from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME
+
+
+ID_FIELDS = {
+    StableIdKind.SCAN: "scan_id",
+    StableIdKind.SLICE: "slice_id",
+    StableIdKind.EVIDENCE_PACK: "evidence_pack_id",
+    StableIdKind.REPORT: "report_id",
+    StableIdKind.EXPORT: "export_id",
+}
+
+
+def stub_payload(tool_name: str, *, target_repo: str, **extra: Any) -> dict[str, Any]:
+    contract = CONTRACT_BY_NAME[tool_name]
+    payload = {
+        "target_repo": target_repo,
+        "runtime_root": runtime_root(Path(target_repo)).as_posix(),
+        **extra,
+    }
+    for kind in contract.stable_ids:
+        field_name = ID_FIELDS[kind]
+        payload.setdefault(field_name, make_stable_id(kind))
+    payload.setdefault("contract_version", "m1")
+    return ok_response(
+        data=payload,
+        messages=[f"{tool_name} is an M1 contract stub."],
+        recommended_next_tools=list(contract.recommended_next_tools),
+    )

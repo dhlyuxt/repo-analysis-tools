@@ -21,6 +21,10 @@ EXPECTED_DIRECTORIES = [
     ROOT / "src" / "repo_analysis_tools" / "doc_specs",
     ROOT / "src" / "repo_analysis_tools" / "doc_dsl",
     ROOT / "src" / "repo_analysis_tools" / "renderers",
+    ROOT / "tests" / "unit",
+    ROOT / "tests" / "contract",
+    ROOT / "tests" / "golden" / "fixtures",
+    ROOT / "docs" / "contracts",
 ]
 
 

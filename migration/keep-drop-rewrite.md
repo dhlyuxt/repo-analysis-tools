@@ -19,12 +19,12 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 | `codewiki/scan/*` | migrate and reorganize | Approved inventory marks scan as deterministic offline core and capability mapping keeps it as the base asset-creation domain. | Move runtime assets from `.claude/codewiki/` to `.codewiki/`; keep scan IDs, provenance capture, and downstream bindings. |
 | `codewiki/scope/*` | migrate and reorganize | Scope heuristics and config-backed classification are already domain-shaped and fixture-backed. | Preserve typed file-role logic and explanation signals, not formatted CLI-only output. |
 | `codewiki/anchors/*` | migrate and reorganize | Anchor extraction is deterministic and central to later slice and impact flows. | Keep structural extraction logic; storage ownership lives with the storage row, not here. |
-| `codewiki/infrastructure/treesitter/*` | migrate and reorganize | Parser substrate is part of the durable anchor extraction stack. | Harvest as infrastructure under new layout; do not preserve old package seams just because they are parser-adjacent. |
-| `codewiki/vendor/fsoft_codewiki/*` | migrate and reorganize | Capability mapping explicitly allows harvested vendored analyzer logic where it supports offline structural facts. | Vendor only the useful deterministic analyzer logic; do not inherit the upstream repo-level workflow shape. |
+| `codewiki/infrastructure/treesitter/*` | migrate and reorganize | Parser substrate is part of the durable anchor extraction stack. Why this keep is safe: it is deterministic local parsing infrastructure rather than a user-facing shell. | Harvest as infrastructure under new layout; strip legacy adapter seams, old package topology, and any assumptions that only make sense inside the old repo layout. |
+| `codewiki/vendor/fsoft_codewiki/*` | migrate and reorganize | Capability mapping explicitly allows harvested vendored analyzer logic where it supports offline structural facts. Why this keep is safe: only parser/analyzer logic with test-backed structural output survives, not the upstream workflow. | Vendor only the useful deterministic analyzer logic; strip repo-level workflow code, old orchestration assumptions, and any boundaries that duplicate the new domain layout. |
 | `codewiki/slices/*` | migrate and reorganize | Slice planning, expansion, seed resolution, and budgets are core query-time analysis capabilities. | Keep `plan_slice`/`expand_slice` behavior as first-class domain tools, not hidden behind `ask`. |
 | `codewiki/evidence/*` | migrate and reorganize | Context-pack construction, citations, and evidence-pack structure are durable core logic. | Keep typed evidence assets and citation rules; shell rendering concerns are classified elsewhere. |
 | `codewiki/impact/service.py` | migrate and reorganize | Conservative impact reasoning maps cleanly into the new `impact` domain. | Keep changed-path and anchor-centered analysis, but bind it to new typed impact assets instead of answer/report shells. |
-| `codewiki/storage/*` plus related `codewiki/scan/storage.py` and anchor/scan persistence surfaces | migrate and reorganize | Storage is durable cross-cutting infrastructure for scans, slices, evidence, and assets, even though session/trace pieces need narrower forward use. | Rebuild schema/layout under `.codewiki/`; product asset persistence survives, while runtime/session telemetry survives only if later phases justify it. |
+| `codewiki/storage/*` plus related `codewiki/scan/storage.py` and anchor/scan persistence surfaces | migrate and reorganize | Storage is durable cross-cutting infrastructure for scan state, asset persistence, and stable slice/evidence handles. Why this keep is safe: the durable part is the asset store and latest-state model, not the runtime telemetry shell. | Rebuild schema/layout under `.codewiki/`; keep scan state, repo asset persistence, and slice/evidence handle persistence now; exclude runtime session telemetry, session replay logs, and trace-event history from M1 by default. |
 | `codewiki/indexing/service.py` | drop | Inventory and mapping both classify indexing as a compatibility wrapper with no new-domain destination. | No `index` compatibility surface survives M1. |
 | `codewiki/retrieval/*` | extract logic, rewrite shell | Retrieval guardrails are valuable, but capability mapping folds them into `evidence` instead of preserving a standalone public subsystem. | Keep freshness, tracked-file checks, and bounded snippet reads as evidence-domain enforcement only. |
 | `codewiki/reporting/service.py` | extract logic, rewrite shell | Reporting starts from durable evidence facts, but the old markdown-writing shell and fixed output path do not survive. | Rebuild as typed report skeleton generation that can feed the future document pipeline. |
@@ -37,10 +37,10 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 
 ## Fixture Nominations
 
-- `tests/fixtures/scope_first_repo.py` is the mandatory fast baseline fixture for contract and migration regression checks.
-- `builds/easyflash-e2e-clean/easyflash/` is the preferred checked-in real-repo baseline because it is already normalized into the harvest evidence set.
-- `EasyFlash-master/` remains a secondary real-repo candidate when M1 or later needs a second independent end-to-end corpus.
-- Existing focus-report, bundle, and demo outputs should be treated only as comparison artifacts when validating rewritten report/export behavior.
+- `tests/fixtures/scope_first_repo.py` anchors fast acceptance for `scan`, `scope`, `anchors`, `slice`, and `evidence` contracts, including the scope-first golden path already exercised by `tests/test_pipeline/test_scope_first_pipeline.py`.
+- `builds/easyflash-e2e-clean/easyflash/` anchors later real-repo acceptance for `scan`, `anchors`, and `impact`, plus rewritten report/export comparisons against the checked-in artifact set under `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`.
+- `EasyFlash-master/` anchors a second real-repo validation lane for repo-understanding and impact scenarios when M1 or later needs coverage outside the normalized clean build tree.
+- Legacy shell outputs are baseline-only comparison artifacts, specifically `builds/easyflash-e2e-artifacts/manifest.json`, `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md`, and the demo/export expectations exercised by `tests/test_pipeline/test_bundle_export.py` and `tests/test_pipeline/test_demo_export.py`.
 
 ## Notes for M1
 
@@ -50,8 +50,12 @@ This baseline collapses the approved M0 inventory and capability mapping into on
 - `agent_runtime`, `ask`, and `answers` are reference implementations for logic harvesting, not architecture templates.
 - `.claude/codewiki/` is a dead runtime root for migration purposes; `.codewiki/` is the only valid direction.
 - Compatibility commands and wrapper names such as `index`, `analyze`, `export`, and `bundle` remain out of scope even if a shell is easy to keep.
+- Storage scope is closed for M1: keep asset persistence, scan state, and stable slice/evidence handles; do not carry forward runtime session telemetry, session replay history, or trace-event persistence by default.
+- `tests/fixtures/scope_first_repo.py` should be the first contract gate for M1 acceptance because it is fast enough to guard every migration step.
+- `builds/easyflash-e2e-clean/easyflash/` should be the first real-repo gate for parser, anchor, impact, and report-shape validation once the core domains are wired.
+- `builds/easyflash-e2e-artifacts/manifest.json` and `builds/easyflash-e2e-clean/docs/codewiki/focus-report.md` should be treated as named comparison artifacts when rewritten report/export behavior is checked.
 
-Highest-risk rewrite and drop rationale:
+## High-Risk Rationale
 
 - `codewiki/agent_runtime/*` is high risk because it mixes useful guarded tool boundaries with session orchestration, telemetry persistence, and chat-runtime assumptions. Migrating it wholesale would smuggle the old product architecture into M1, so only selected contracts such as guarded span access and domain tool boundaries should be harvested.
 - `codewiki/ask/*` and `codewiki/answers/*` are high risk because they hide slice planning, evidence gathering, and conservative summarization behind a single ask-shaped surface. M1 needs those underlying capabilities exposed directly, not re-wrapped into another mega-entrypoint that blurs facts, inference, and unknowns.

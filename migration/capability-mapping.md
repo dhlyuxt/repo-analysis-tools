@@ -126,6 +126,7 @@ Carry forward:
 New contract direction:
 - `report` owns structured report skeleton generation such as `render_focus_report`, `render_module_summary`, and `render_analysis_outline`
 - The new contract should return typed report assets or document-ready skeletons that the future document spec / DSL / renderer pipeline can validate and render
+- Legacy export-oriented behavior does not belong to `report`; `ReportingService.export` is the historical seed for the new `export` domain instead
 - Legacy markdown-writing shells and fixed output paths do not survive as compatibility surfaces; report is an upstream structured-facts producer, not the final document system by itself
 
 ## export
@@ -139,6 +140,7 @@ Old sources:
 Carry forward:
 - The idea that analysis assets can be packaged for later reuse, comparison, review, or transport
 - Manifest-style metadata from demo artifacts that can inform bundle shape and completeness checks
+- Legacy export-oriented behavior from `ReportingService.export` is the historical seed for the new `export` domain, not for report generation
 - Storage-backed handles that make exported artifacts refer to stable scans, slices, evidence packs, and reports instead of anonymous files
 
 New contract direction:

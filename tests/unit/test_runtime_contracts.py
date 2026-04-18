@@ -1,5 +1,8 @@
+import os
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from repo_analysis_tools.core.errors import ErrorCode, error_response
 from repo_analysis_tools.core.ids import StableIdKind, make_stable_id
@@ -15,8 +18,25 @@ class RuntimeContractsTest(unittest.TestCase):
     def setUp(self) -> None:
         self.repo_root = Path("/tmp/example-repo")
 
+    @contextmanager
+    def chdir(self, path: Path):
+        previous_cwd = Path.cwd()
+        os.chdir(path)
+        try:
+            yield
+        finally:
+            os.chdir(previous_cwd)
+
     def test_runtime_root_is_codewiki(self) -> None:
         self.assertEqual(runtime_root(self.repo_root), self.repo_root / ".codewiki")
+
+    def test_runtime_root_matches_absolute_and_relative_repo_paths(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            repo_dir = temp_path / "example-repo"
+            repo_dir.mkdir()
+            with self.chdir(temp_path):
+                self.assertEqual(runtime_root("example-repo"), runtime_root(repo_dir))
 
     def test_normalize_repo_relative_path_rejects_escape(self) -> None:
         with self.assertRaises(ValueError):
@@ -41,3 +61,7 @@ class RuntimeContractsTest(unittest.TestCase):
             self.repo_root / ".codewiki" / "scan",
         )
         self.assertEqual(STORAGE_BOUNDARIES["evidence"].directory_name, "evidence")
+
+    def test_domain_storage_root_rejects_undeclared_domains(self) -> None:
+        with self.assertRaisesRegex(ValueError, "undeclared storage domain"):
+            domain_storage_root(self.repo_root, "unknown")

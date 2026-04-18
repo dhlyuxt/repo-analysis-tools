@@ -8,14 +8,11 @@ def _register_tools() -> None:
 
 
 def create_server():
-    _register_tools()
     return mcp
 
 
 def main() -> None:
-    from repo_analysis_tools.mcp import tools as registered_tools
-
-    _ = registered_tools
+    _register_tools()
     create_server().run(transport="stdio")
 
 

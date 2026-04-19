@@ -7,6 +7,7 @@ from unittest.mock import patch
 
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME
 from repo_analysis_tools.mcp.tools.evidence_tools import build_evidence_pack, read_evidence_pack
+from repo_analysis_tools.mcp.tools.impact_tools import impact_from_paths, summarize_impact
 from repo_analysis_tools.mcp.tools.scan_tools import scan_repo
 from repo_analysis_tools.mcp.tools.slice_tools import plan_slice
 from tests.fixtures.scope_first_repo import build_scope_first_repo
@@ -25,10 +26,14 @@ class ContractGoldenTest(unittest.TestCase):
     def _deterministic_evidence_pack_id(self) -> str:
         return "evidence_pack_000000000001"
 
+    def _deterministic_impact_id(self) -> str:
+        return "impact_000000000001"
+
     def _deterministic_make_stable_id(self, kind) -> str:
         return {
             "scan": self._deterministic_scan_id(),
             "slice": self._deterministic_slice_id(),
+            "impact": self._deterministic_impact_id(),
             "evidence_pack": self._deterministic_evidence_pack_id(),
         }[kind.value]
 
@@ -64,6 +69,7 @@ class ContractGoldenTest(unittest.TestCase):
                 patch("repo_analysis_tools.scan.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
                 patch("repo_analysis_tools.slice.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
                 patch("repo_analysis_tools.evidence.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
+                patch("repo_analysis_tools.impact.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
                 patch("repo_analysis_tools.scan.service.datetime") as mock_datetime,
             ):
                 mock_datetime.now.return_value = datetime(2026, 4, 19, 3, 13, 48, 74284, tzinfo=timezone.utc)
@@ -76,6 +82,24 @@ class ContractGoldenTest(unittest.TestCase):
         self.assertEqual(plan_payload["data"]["slice_id"], self._deterministic_slice_id())
         self.assertEqual(build_payload["data"]["evidence_pack_id"], self._deterministic_evidence_pack_id())
         assert_matches_fixture(self, "read_evidence_pack_scope_first.json", self._normalize_repo_paths(payload))
+
+    def test_summarize_impact_payload_matches_golden_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            with (
+                patch("repo_analysis_tools.scan.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
+                patch("repo_analysis_tools.slice.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
+                patch("repo_analysis_tools.evidence.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
+                patch("repo_analysis_tools.impact.service.make_stable_id", side_effect=self._deterministic_make_stable_id),
+                patch("repo_analysis_tools.scan.service.datetime") as mock_datetime,
+            ):
+                mock_datetime.now.return_value = datetime(2026, 4, 19, 3, 13, 48, 74284, tzinfo=timezone.utc)
+                scan_repo(str(repo))
+                impact_payload = impact_from_paths(str(repo), ["src/flash.c"])
+                payload = summarize_impact(str(repo), impact_payload["data"]["impact_id"])
+
+        self.assertEqual(impact_payload["data"]["impact_id"], self._deterministic_impact_id())
+        assert_matches_fixture(self, "summarize_impact_scope_first.json", self._normalize_repo_paths(payload))
 
     def test_scan_repo_fixture_tracks_declared_scan_fields(self) -> None:
         fixture = load_fixture("scan_repo.json")

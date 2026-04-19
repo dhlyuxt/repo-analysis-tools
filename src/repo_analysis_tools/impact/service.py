@@ -86,10 +86,26 @@ class ImpactService:
         )
 
     def _resolve_anchor(self, target_repo: Path, anchor_name: str, scan_id: str) -> AnchorRecord:
-        matches = self.anchor_service.find_anchor_matches(target_repo, anchor_name, scan_id=scan_id)
-        if not matches:
-            raise FileNotFoundError(f"anchor {anchor_name.strip()} was not found")
-        return matches[0]
+        validated_name = anchor_name.strip()
+        snapshot = self.anchor_service.load_snapshot(target_repo, scan_id=scan_id)
+        exact_matches = [anchor for anchor in snapshot.anchors if anchor.name == validated_name]
+        if not exact_matches:
+            raise FileNotFoundError(f"anchor {validated_name} was not found")
+
+        definition_matches = [
+            anchor for anchor in exact_matches if anchor.kind == "function_definition"
+        ]
+        if len(definition_matches) == 1:
+            return definition_matches[0]
+        if len(definition_matches) > 1:
+            raise ValueError(
+                f"anchor {validated_name} is ambiguous; disambiguate the requested anchor first"
+            )
+        if len(exact_matches) == 1:
+            return exact_matches[0]
+        raise ValueError(
+            f"anchor {validated_name} is ambiguous; disambiguate the requested anchor first"
+        )
 
     def _normalized_paths(self, target_repo: Path, changed_paths: list[str]) -> list[str]:
         normalized: list[str] = []

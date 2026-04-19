@@ -47,12 +47,11 @@ def reverse_callers_for_anchors(
     callers: dict[str, ImpactTarget] = {}
     seed_anchor_ids = {anchor.anchor_id for anchor in seed_anchors}
     seed_names = sorted({anchor.name for anchor in seed_anchors})
-    seed_name_set = set(seed_names)
 
     for relation in snapshot.relations:
         if relation.kind != "direct_call":
             continue
-        if relation.target_anchor_id not in seed_anchor_ids and relation.target_name not in seed_name_set:
+        if relation.target_anchor_id not in seed_anchor_ids:
             continue
         caller_anchor = anchors_by_id.get(relation.source_anchor_id)
         if caller_anchor is None:
@@ -75,5 +74,7 @@ def reverse_callers_for_anchors(
                 item.kind or "",
             ),
         ),
-        notes=[f"Reverse-caller propagation for {names_text} is bounded by available anchor relations."],
+        notes=[
+            f"Reverse-caller propagation for {names_text} is limited to direct_call relations with explicit target anchors and is bounded by available anchor relations."
+        ],
     )

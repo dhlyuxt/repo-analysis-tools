@@ -15,7 +15,7 @@ from repo_analysis_tools.slice.models import SliceManifest
 from repo_analysis_tools.slice.store import SliceStore
 
 
-MAX_OPEN_SPAN_LINES = 80
+MAX_OPEN_SPAN_LINES = 40
 
 
 class EvidenceService:
@@ -61,13 +61,14 @@ class EvidenceService:
             line_start=line_start,
             line_end=line_end,
         )
+        snippet = read_snippet(repo, normalized_path, line_start, line_end)
         return OpenSpanResult(
             target_repo=repo.as_posix(),
             evidence_pack_id=evidence_pack.evidence_pack_id,
             path=normalized_path,
             line_start=line_start,
             line_end=line_end,
-            lines=read_snippet(repo, normalized_path, line_start, line_end),
+            lines=snippet.splitlines(),
         )
 
     def _citations_for_manifest(

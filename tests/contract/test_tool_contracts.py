@@ -311,9 +311,11 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(build_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
             self.assertEqual(build_payload["data"]["citation_count"], 1)
             self.assertEqual(read_payload["data"]["citations"][0]["file_path"], "src/flash.c")
+            self.assertEqual(read_payload["recommended_next_tools"], ["open_span", "describe_anchor"])
             self.assertEqual(open_payload["data"]["line_start"], 1)
             self.assertEqual(open_payload["data"]["line_end"], 1)
             self.assertEqual(open_payload["data"]["lines"], ["int flash_init(void) { return 0; }"])
+            self.assertEqual(open_payload["recommended_next_tools"], ["read_evidence_pack", "describe_anchor"])
 
     def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

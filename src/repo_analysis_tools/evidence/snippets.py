@@ -14,7 +14,7 @@ def _decode_source(raw_bytes: bytes) -> str:
     return raw_bytes.decode("utf-8", errors="replace")
 
 
-def read_snippet(target_repo: Path | str, relative_path: str, line_start: int, line_end: int) -> list[str]:
+def read_snippet(target_repo: Path | str, relative_path: str, line_start: int, line_end: int) -> str:
     if line_start < 1 or line_end < line_start:
         raise ValueError("line range must satisfy 1 <= line_start <= line_end")
 
@@ -26,4 +26,4 @@ def read_snippet(target_repo: Path | str, relative_path: str, line_start: int, l
 
     if line_end > len(lines):
         raise ValueError(f"requested line range exceeds file length for {normalized_path}")
-    return lines[line_start - 1 : line_end]
+    return "\n".join(lines[line_start - 1 : line_end])

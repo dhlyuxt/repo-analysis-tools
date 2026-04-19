@@ -11,6 +11,9 @@ from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 class EvidenceServiceTest(unittest.TestCase):
+    def test_open_span_limit_matches_spec(self) -> None:
+        self.assertEqual(MAX_OPEN_SPAN_LINES, 40)
+
     def test_build_and_read_persist_real_citations_from_slice_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
@@ -106,6 +109,6 @@ class EvidenceServiceTest(unittest.TestCase):
             (repo / "src").mkdir(parents=True, exist_ok=True)
             (repo / "src" / "legacy.txt").write_bytes("你好，世界\n第二行\n".encode("gb18030"))
 
-            lines = read_snippet(repo, "src/legacy.txt", 1, 2)
+            snippet = read_snippet(repo, "src/legacy.txt", 1, 2)
 
-            self.assertEqual(lines, ["你好，世界", "第二行"])
+            self.assertEqual(snippet, "你好，世界\n第二行")

@@ -1,0 +1,28 @@
+{
+  "schema_version": "1",
+  "status": "ok",
+  "data": {
+    "target_repo": "<repo>",
+    "runtime_root": "<repo>/.codewiki",
+    "evidence_pack_id": "evidence_pack_000000000001",
+    "summary": "Evidence pack for slice slice_000000000001 contains 1 citations across 1 file(s).",
+    "citations": [
+      {
+        "file_path": "src/flash.c",
+        "anchor_name": "flash_init",
+        "kind": "function_definition",
+        "line_start": 1,
+        "line_end": 1
+      }
+    ]
+  },
+  "messages": [
+    {
+      "level": "info",
+      "text": "evidence pack loaded"
+    }
+  ],
+  "recommended_next_tools": [
+    "open_span"
+  ]
+}

@@ -1,19 +1,24 @@
 {
+  "schema_version": "1",
+  "status": "ok",
   "data": {
-    "runtime_root": "/tmp/demo-repo/.codewiki",
+    "target_repo": "<repo>",
+    "runtime_root": "<repo>/.codewiki",
     "scan_id": "scan_000000000001",
-    "target_repo": "/tmp/demo-repo"
+    "repo_root": "<repo>",
+    "file_count": 6,
+    "latest_completed_at": "2026-04-19T03:13:48.074284+00:00",
+    "git_head": null,
+    "workspace_dirty": null
   },
   "messages": [
     {
       "level": "info",
-      "text": "scan_repo is an M1 contract stub."
+      "text": "scan completed"
     }
   ],
   "recommended_next_tools": [
     "get_scan_status",
     "show_scope"
-  ],
-  "schema_version": "1",
-  "status": "ok"
+  ]
 }

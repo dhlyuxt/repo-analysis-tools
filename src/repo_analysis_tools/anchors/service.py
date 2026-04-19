@@ -50,9 +50,25 @@ class AnchorService:
         snapshot = self.load_snapshot(target_repo, scan_id=scan_id)
         exact_matches = [anchor for anchor in snapshot.anchors if anchor.name == validated_anchor_name]
         if exact_matches:
-            return exact_matches
+            return sorted(
+                exact_matches,
+                key=lambda item: (
+                    0 if item.kind == "function_definition" else 1,
+                    item.path,
+                    item.start_line,
+                    item.kind,
+                ),
+            )
         lowered = validated_anchor_name.lower()
-        return [anchor for anchor in snapshot.anchors if lowered in anchor.name.lower()]
+        return sorted(
+            [anchor for anchor in snapshot.anchors if lowered in anchor.name.lower()],
+            key=lambda item: (
+                0 if item.kind == "function_definition" else 1,
+                item.path,
+                item.start_line,
+                item.kind,
+            ),
+        )
 
     def describe_anchor(
         self,

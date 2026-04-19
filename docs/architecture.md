@@ -1,6 +1,6 @@
-# M1 Architecture Baseline
+# M2 Analysis-First Mainline Architecture
 
-This document records the M1 architecture seams that later milestones must preserve while real analysis behavior is added.
+This document records the architecture seams that the analysis-first mainline must preserve while real repository-understanding behavior is added.
 
 ## Package Boundaries
 
@@ -24,6 +24,31 @@ The repository keeps a visible top-level split between:
 - `tests`: contract, unit, integration, and golden verification layers.
 
 The intended workflow spine remains `scan -> scope -> anchors -> slice -> evidence -> impact -> report -> export`.
+
+## M2 Mainline Handoff
+
+M2 makes the repository-understanding path real for Codex sessions:
+
+```text
+scan_repo
+-> get_scan_status
+-> show_scope
+-> list_anchors / find_anchor / describe_anchor
+-> plan_slice
+-> build_evidence_pack
+-> read_evidence_pack
+-> open_span
+```
+
+The supported persistence model is JSON-first and domain-owned. Each scan writes runtime assets under `<target_repo>/.codewiki/` in domain-specific directories so later steps can reopen prior results without recomputing everything:
+
+- `scan` stores scan snapshots and the latest scan pointer.
+- `scope` stores scope snapshots derived from scans.
+- `anchors` stores extracted anchors and anchor relations.
+- `slice` stores slice manifests and slice inspection state.
+- `evidence` stores evidence packs and the citations they reopen.
+
+`open_span` is intentionally bounded. It may only open a span that is fully covered by an evidence citation, and it must still respect `MAX_OPEN_SPAN_LINES` from the evidence service. It is not a generic file browser and must not be used to inspect arbitrary repository text outside the cited evidence path.
 
 ## Runtime Root And Path Rules
 

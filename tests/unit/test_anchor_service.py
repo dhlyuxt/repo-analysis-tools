@@ -3,6 +3,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from repo_analysis_tools.core.errors import ErrorCode
+from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor
 from repo_analysis_tools.anchors.parser import CAnchorParser
 from repo_analysis_tools.anchors.service import AnchorService
 from repo_analysis_tools.anchors.store import AnchorStore
@@ -28,6 +30,36 @@ class AnchorServiceTest(unittest.TestCase):
 
         self.assertEqual(parsed.backend, "tree-sitter-c")
         self.assertTrue({"flash_init", "main"}.issubset({anchor.name for anchor in parsed.anchors}))
+        self.assertEqual(
+            [
+                (relation.kind, relation.source_name, relation.target_name, relation.line, relation.target_path)
+                for relation in parsed.relations
+                if relation.kind == "includes"
+            ],
+            [("includes", "main", "config.h", 1, "config.h")],
+        )
+
+    def test_regex_fallback_keeps_extracting_top_level_anchors_after_first_function(self) -> None:
+        parser = CAnchorParser()
+        source_text = (
+            '#include "a.h"\n'
+            "int one(void){ return 0; }\n"
+            "int two(void){ return one(); }\n"
+        )
+
+        with patch("repo_analysis_tools.anchors.parser._try_build_tree_sitter_parser", return_value=None):
+            parsed = parser.parse_file("src/demo.c", source_text)
+
+        self.assertEqual(parsed.backend, "regex-compat")
+        self.assertTrue({"one", "two"}.issubset({anchor.name for anchor in parsed.anchors}))
+        self.assertEqual(
+            [
+                (relation.kind, relation.source_name, relation.target_name, relation.line, relation.target_path)
+                for relation in parsed.relations
+                if relation.kind == "includes"
+            ],
+            [("includes", "one", "a.h", 1, "a.h"), ("includes", "two", "a.h", 1, "a.h")],
+        )
 
     def test_build_snapshot_extracts_expected_anchors_and_relations_from_synthetic_repo(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -46,12 +78,18 @@ class AnchorServiceTest(unittest.TestCase):
             )
             self.assertTrue(
                 {
-                    ("defines", "EF_USING_ENV", "src/config.h"),
-                    ("direct_call", "main", "flash_init"),
-                    ("includes", "main", "config.h"),
+                    ("defines", "EF_USING_ENV", "src/config.h", 1, "src/config.h"),
+                    ("direct_call", "main", "flash_init", 3, "src/main.c"),
+                    ("includes", "main", "config.h", 1, "config.h"),
                 }.issubset(
                     {
-                        (relation.kind, relation.source_name, relation.target_name)
+                        (
+                            relation.kind,
+                            relation.source_name,
+                            relation.target_name,
+                            relation.line,
+                            relation.target_path,
+                        )
                         for relation in snapshot.relations
                     }
                 )
@@ -84,3 +122,28 @@ class AnchorServiceTest(unittest.TestCase):
                     if relation.kind == "direct_call"
                 },
             )
+
+    def test_service_rejects_empty_anchor_name_queries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = AnchorService()
+
+            with self.assertRaisesRegex(ValueError, "anchor_name must not be empty"):
+                service.find_anchor_matches(repo, "", scan_snapshot.scan_id)
+
+            with self.assertRaisesRegex(ValueError, "anchor_name must not be empty"):
+                service.describe_anchor(repo, "   ", scan_snapshot.scan_id)
+
+    def test_anchor_tools_reject_empty_anchor_name_queries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            find_payload = find_anchor(str(repo), "", scan_snapshot.scan_id)
+            describe_payload = describe_anchor(str(repo), "   ", scan_snapshot.scan_id)
+
+            self.assertEqual(find_payload["status"], "error")
+            self.assertEqual(find_payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
+            self.assertEqual(describe_payload["status"], "error")
+            self.assertEqual(describe_payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)

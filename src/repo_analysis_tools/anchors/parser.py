@@ -81,7 +81,10 @@ def _extract_with_tree_sitter(parser: object, relative_path: str, source_text: s
     function_anchors: list[tuple[AnchorRecord, object]] = []
 
     include_targets = [
-        _clean_include_target(_node_text(path_node, source_bytes))
+        (
+            _clean_include_target(_node_text(path_node, source_bytes)),
+            path_node.start_point.row + 1,
+        )
         for path_node in _captured_nodes(language, root, _TREE_SITTER_INCLUDE_QUERY, "include.path")
         if _is_file_level(path_node)
     ]
@@ -181,10 +184,10 @@ def _extract_with_tree_sitter(parser: object, relative_path: str, source_text: s
                 source_anchor_id=anchor.anchor_id,
                 source_name=anchor.name,
                 target_name=include_target,
-                target_path=relative_path,
-                line=1,
+                target_path=include_target,
+                line=include_line,
             )
-            for include_target in include_targets
+            for include_target, include_line in include_targets
         )
         relations.extend(
             _tree_sitter_direct_calls(
@@ -479,7 +482,7 @@ def _scan_top_level_items(
                     )
                     index = body_end
                     statement_start = index + 1
-                    depth = 0
+                    continue
             depth += 1
         elif character == "}":
             depth = max(0, depth - 1)
@@ -579,7 +582,7 @@ def _build_include_relations(anchor: AnchorRecord, relative_path: str, source_te
                 source_anchor_id=anchor.anchor_id,
                 source_name=anchor.name,
                 target_name=match.group(1),
-                target_path=relative_path,
+                target_path=match.group(1),
                 line=line,
             )
         )

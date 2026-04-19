@@ -46,11 +46,12 @@ class AnchorService:
         anchor_name: str,
         scan_id: str | None = None,
     ) -> list:
+        validated_anchor_name = self._validated_anchor_name(anchor_name)
         snapshot = self.load_snapshot(target_repo, scan_id=scan_id)
-        exact_matches = [anchor for anchor in snapshot.anchors if anchor.name == anchor_name]
+        exact_matches = [anchor for anchor in snapshot.anchors if anchor.name == validated_anchor_name]
         if exact_matches:
             return exact_matches
-        lowered = anchor_name.lower()
+        lowered = validated_anchor_name.lower()
         return [anchor for anchor in snapshot.anchors if lowered in anchor.name.lower()]
 
     def describe_anchor(
@@ -59,10 +60,11 @@ class AnchorService:
         anchor_name: str,
         scan_id: str | None = None,
     ) -> AnchorDescription:
+        validated_anchor_name = self._validated_anchor_name(anchor_name)
         snapshot = self.load_snapshot(target_repo, scan_id=scan_id)
-        matches = self.find_anchor_matches(target_repo, anchor_name, scan_id=scan_id)
+        matches = self.find_anchor_matches(target_repo, validated_anchor_name, scan_id=scan_id)
         if not matches:
-            raise FileNotFoundError(f"anchor {anchor_name} was not found")
+            raise FileNotFoundError(f"anchor {validated_anchor_name} was not found")
         anchor = sorted(
             matches,
             key=lambda item: (
@@ -87,3 +89,9 @@ class AnchorService:
             for relation in relations
             if relation.source_anchor_id == anchor_id
         ]
+
+    def _validated_anchor_name(self, anchor_name: str) -> str:
+        normalized = anchor_name.strip()
+        if not normalized:
+            raise ValueError("anchor_name must not be empty")
+        return normalized

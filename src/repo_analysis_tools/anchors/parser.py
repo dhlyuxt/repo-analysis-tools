@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from bisect import bisect_right
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import PurePosixPath
 import re
 
@@ -24,6 +25,28 @@ _CONTROL_CALLS = {
     "return",
     "sizeof",
 }
+_TREE_SITTER_FUNCTION_DEFINITION_QUERY = """
+(function_definition
+  declarator: (function_declarator declarator: (_) @function.name)
+) @function.node
+"""
+_TREE_SITTER_FUNCTION_DECLARATION_QUERY = """
+(declaration
+  declarator: (function_declarator declarator: (_) @function.name)
+) @function.node
+"""
+_TREE_SITTER_TYPE_DEFINITION_QUERY = """
+(type_definition declarator: (_) @type.name) @type.node
+"""
+_TREE_SITTER_MACRO_QUERY = """
+[
+  (preproc_def name: (identifier) @macro.name)
+  (preproc_function_def name: (identifier) @macro.name)
+] @macro.node
+"""
+_TREE_SITTER_INCLUDE_QUERY = """
+(preproc_include path: [(string_literal) (system_lib_string)] @include.path) @include.node
+"""
 
 
 @dataclass(frozen=True)
@@ -47,25 +70,303 @@ class CAnchorParser:
 
 
 def _extract_with_tree_sitter(parser: object, relative_path: str, source_text: str) -> ParsedAnchors:
-    # The current environment falls back to the regex extractor because the installed
-    # tree-sitter runtime rejects the bundled tree-sitter-c ABI. Keep the tree-sitter
-    # code path as a simple hook for compatible environments.
-    return _extract_with_regex(relative_path, source_text, backend="tree-sitter-c")
+    source_bytes = source_text.encode("utf-8")
+    tree = parser.parse(source_bytes)
+    root = tree.root_node
+    language = parser.language
+    scope_node_id = make_scope_node_id(_scope_label(relative_path))
+
+    anchors: list[AnchorRecord] = []
+    relations: list[AnchorRelation] = []
+    function_anchors: list[tuple[AnchorRecord, object]] = []
+
+    include_targets = [
+        _clean_include_target(_node_text(path_node, source_bytes))
+        for path_node in _captured_nodes(language, root, _TREE_SITTER_INCLUDE_QUERY, "include.path")
+        if _is_file_level(path_node)
+    ]
+
+    for macro_node in _captured_nodes(language, root, _TREE_SITTER_MACRO_QUERY, "macro.node"):
+        if not _is_file_level(macro_node):
+            continue
+        name_node = macro_node.child_by_field_name("name")
+        if name_node is None:
+            continue
+        name = _node_text(name_node, source_bytes)
+        anchor = AnchorRecord(
+            anchor_id=make_anchor_id(
+                relative_path,
+                "macro_definition",
+                name,
+                macro_node.start_point.row + 1,
+                macro_node.end_point.row,
+            ),
+            scope_node_id=scope_node_id,
+            kind="macro_definition",
+            name=name,
+            path=relative_path,
+            start_line=macro_node.start_point.row + 1,
+            end_line=max(macro_node.start_point.row + 1, macro_node.end_point.row),
+        )
+        anchors.append(anchor)
+        relations.append(
+            AnchorRelation(
+                kind="defines",
+                source_anchor_id=anchor.anchor_id,
+                source_name=anchor.name,
+                target_name=relative_path,
+                target_path=relative_path,
+                line=anchor.start_line,
+            )
+        )
+
+    for function_node in _captured_nodes(language, root, _TREE_SITTER_FUNCTION_DEFINITION_QUERY, "function.node"):
+        if not _is_file_level(function_node):
+            continue
+        anchor = _function_anchor_from_node(
+            node=function_node,
+            kind="function_definition",
+            relative_path=relative_path,
+            scope_node_id=scope_node_id,
+            source_bytes=source_bytes,
+        )
+        if anchor is None:
+            continue
+        anchors.append(anchor)
+        function_anchors.append((anchor, function_node))
+
+    for declaration_node in _captured_nodes(language, root, _TREE_SITTER_FUNCTION_DECLARATION_QUERY, "function.node"):
+        if not _is_file_level(declaration_node):
+            continue
+        anchor = _function_anchor_from_node(
+            node=declaration_node,
+            kind="function_declaration",
+            relative_path=relative_path,
+            scope_node_id=scope_node_id,
+            source_bytes=source_bytes,
+        )
+        if anchor is None:
+            continue
+        anchors.append(anchor)
+
+    for type_node in _captured_nodes(language, root, _TREE_SITTER_TYPE_DEFINITION_QUERY, "type.node"):
+        if not _is_file_level(type_node):
+            continue
+        declarator = type_node.child_by_field_name("declarator")
+        type_name = _declarator_identifier(declarator, source_bytes)
+        if type_name is None:
+            continue
+        anchors.append(
+            AnchorRecord(
+                anchor_id=make_anchor_id(
+                    relative_path,
+                    "type_definition",
+                    type_name,
+                    type_node.start_point.row + 1,
+                    max(type_node.start_point.row + 1, type_node.end_point.row),
+                ),
+                scope_node_id=scope_node_id,
+                kind="type_definition",
+                name=type_name,
+                path=relative_path,
+                start_line=type_node.start_point.row + 1,
+                end_line=max(type_node.start_point.row + 1, type_node.end_point.row),
+            )
+        )
+
+    for anchor, function_node in function_anchors:
+        relations.extend(
+            AnchorRelation(
+                kind="includes",
+                source_anchor_id=anchor.anchor_id,
+                source_name=anchor.name,
+                target_name=include_target,
+                target_path=relative_path,
+                line=1,
+            )
+            for include_target in include_targets
+        )
+        relations.extend(
+            _tree_sitter_direct_calls(
+                anchor=anchor,
+                function_node=function_node,
+                source_bytes=source_bytes,
+            )
+        )
+
+    anchors_by_name: dict[str, list[AnchorRecord]] = {}
+    for anchor in anchors:
+        anchors_by_name.setdefault(anchor.name, []).append(anchor)
+
+    resolved_relations: list[AnchorRelation] = []
+    for relation in relations:
+        target_anchor = _resolve_target_anchor(anchors_by_name, relation.target_name)
+        resolved_relations.append(
+            AnchorRelation(
+                kind=relation.kind,
+                source_anchor_id=relation.source_anchor_id,
+                source_name=relation.source_name,
+                target_name=relation.target_name,
+                target_anchor_id=target_anchor.anchor_id if target_anchor is not None else relation.target_anchor_id,
+                target_path=target_anchor.path if target_anchor is not None else relation.target_path,
+                line=relation.line,
+            )
+        )
+    return ParsedAnchors(
+        backend="tree-sitter-c",
+        anchors=sorted(anchors, key=lambda item: (item.path, item.start_line, item.name, item.kind)),
+        relations=sorted(
+            resolved_relations,
+            key=lambda item: (item.source_name, item.kind, item.target_name, item.line or 0),
+        ),
+    )
 
 
 def _try_build_tree_sitter_parser() -> object | None:
+    language = _try_build_tree_sitter_language()
+    if language is None:
+        return None
     try:
-        from tree_sitter import Language, Parser
+        from tree_sitter import Parser
+    except ImportError:
+        return None
+    parser = Parser()
+    parser.language = language
+    return parser
+
+
+@lru_cache(maxsize=1)
+def _try_build_tree_sitter_language() -> object | None:
+    try:
+        from tree_sitter import Language
         import tree_sitter_c
     except ImportError:
         return None
     try:
-        language = Language(tree_sitter_c.language())
-        parser = Parser()
-        parser.language = language
+        return Language(tree_sitter_c.language())
     except ValueError:
         return None
-    return parser
+    return None
+
+
+def _captured_nodes(language: object, root: object, query_source: str, capture_name: str) -> list[object]:
+    captures = language.query(query_source).captures(root)
+    return sorted(captures.get(capture_name, []), key=lambda node: (node.start_byte, node.end_byte))
+
+
+def _function_anchor_from_node(
+    *,
+    node: object,
+    kind: str,
+    relative_path: str,
+    scope_node_id: str,
+    source_bytes: bytes,
+) -> AnchorRecord | None:
+    declarator = node.child_by_field_name("declarator")
+    function_name = _declarator_identifier(declarator, source_bytes)
+    if function_name is None:
+        return None
+    start_line = node.start_point.row + 1
+    end_line = max(start_line, node.end_point.row)
+    return AnchorRecord(
+        anchor_id=make_anchor_id(relative_path, kind, function_name, start_line, end_line),
+        scope_node_id=scope_node_id,
+        kind=kind,
+        name=function_name,
+        path=relative_path,
+        start_line=start_line,
+        end_line=end_line,
+    )
+
+
+def _declarator_identifier(node: object | None, source_bytes: bytes) -> str | None:
+    if node is None:
+        return None
+    if node.type in {"identifier", "type_identifier"}:
+        return _node_text(node, source_bytes)
+    for child in node.named_children:
+        child_name = _declarator_identifier(child, source_bytes)
+        if child_name is not None:
+            return child_name
+    return None
+
+
+def _tree_sitter_direct_calls(
+    *,
+    anchor: AnchorRecord,
+    function_node: object,
+    source_bytes: bytes,
+) -> list[AnchorRelation]:
+    body = function_node.child_by_field_name("body")
+    if body is None:
+        return []
+    relations: list[AnchorRelation] = []
+    seen: set[tuple[str, int]] = set()
+    for node in _iter_named_descendants(body):
+        if node.type != "call_expression":
+            continue
+        callee = node.child_by_field_name("function")
+        if callee is None or callee.type != "identifier":
+            continue
+        callee_name = _node_text(callee, source_bytes)
+        if callee_name == anchor.name or callee_name in _CONTROL_CALLS:
+            continue
+        if callee_name.upper() == callee_name:
+            continue
+        line = node.start_point.row + 1
+        relation_key = (callee_name, line)
+        if relation_key in seen:
+            continue
+        seen.add(relation_key)
+        relations.append(
+            AnchorRelation(
+                kind="direct_call",
+                source_anchor_id=anchor.anchor_id,
+                source_name=anchor.name,
+                target_name=callee_name,
+                line=line,
+            )
+        )
+    return relations
+
+
+def _iter_named_descendants(node: object) -> list[object]:
+    descendants: list[object] = []
+    stack = list(reversed(node.named_children))
+    while stack:
+        current = stack.pop()
+        descendants.append(current)
+        stack.extend(reversed(current.named_children))
+    return descendants
+
+
+def _node_text(node: object, source_bytes: bytes) -> str:
+    return source_bytes[node.start_byte:node.end_byte].decode("utf-8", "ignore")
+
+
+def _clean_include_target(raw: str) -> str:
+    if raw.startswith('"') and raw.endswith('"'):
+        return raw[1:-1]
+    if raw.startswith("<") and raw.endswith(">"):
+        return raw[1:-1]
+    return raw
+
+
+def _is_file_level(node: object) -> bool:
+    current = node.parent
+    while current is not None:
+        if current.type in {
+            "function_definition",
+            "compound_statement",
+            "declaration",
+            "expression_statement",
+            "parameter_list",
+            "field_declaration_list",
+            "initializer_list",
+        }:
+            return False
+        current = current.parent
+    return True
 
 
 def _extract_with_regex(relative_path: str, source_text: str, *, backend: str = "regex-compat") -> ParsedAnchors:

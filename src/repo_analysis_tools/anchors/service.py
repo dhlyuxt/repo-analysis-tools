@@ -63,7 +63,15 @@ class AnchorService:
         matches = self.find_anchor_matches(target_repo, anchor_name, scan_id=scan_id)
         if not matches:
             raise FileNotFoundError(f"anchor {anchor_name} was not found")
-        anchor = sorted(matches, key=lambda item: (item.path, item.start_line, item.kind))[0]
+        anchor = sorted(
+            matches,
+            key=lambda item: (
+                0 if item.kind == "function_definition" else 1,
+                item.path,
+                item.start_line,
+                item.kind,
+            ),
+        )[0]
         relations = self._relations_for_anchor(snapshot.relations, anchor.anchor_id)
         location = f"{anchor.path}:{anchor.start_line}-{anchor.end_line}"
         description = f"{anchor.kind} {anchor.name} in {location}"

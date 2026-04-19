@@ -61,6 +61,12 @@ class EvidenceService:
             line_start=line_start,
             line_end=line_end,
         )
+        drifted_files = evaluate_selected_file_freshness(repo, evidence_pack.scan_id, [normalized_path])
+        if drifted_files:
+            drifted_list = ", ".join(drifted_files)
+            raise ValueError(
+                f"requested span references drifted evidence since scan {evidence_pack.scan_id}: {drifted_list}"
+            )
         snippet = read_snippet(repo, normalized_path, line_start, line_end)
         return OpenSpanResult(
             target_repo=repo.as_posix(),

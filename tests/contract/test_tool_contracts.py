@@ -311,11 +311,11 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(build_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
             self.assertEqual(build_payload["data"]["citation_count"], 1)
             self.assertEqual(read_payload["data"]["citations"][0]["file_path"], "src/flash.c")
-            self.assertEqual(read_payload["recommended_next_tools"], ["open_span", "describe_anchor"])
+            self.assertEqual(read_payload["recommended_next_tools"], ["open_span"])
             self.assertEqual(open_payload["data"]["line_start"], 1)
             self.assertEqual(open_payload["data"]["line_end"], 1)
             self.assertEqual(open_payload["data"]["lines"], ["int flash_init(void) { return 0; }"])
-            self.assertEqual(open_payload["recommended_next_tools"], ["read_evidence_pack", "describe_anchor"])
+            self.assertEqual(open_payload["recommended_next_tools"], ["read_evidence_pack"])
 
     def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -325,6 +325,19 @@ class ToolContractsTest(unittest.TestCase):
             build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
 
             payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 2)
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+
+    def test_open_span_returns_invalid_input_when_cited_file_has_drifted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+            (repo / "src" / "flash.c").write_text("int flash_init(void) { return 9; }\n", encoding="utf-8")
+
+            payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 1)
 
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], "invalid_input")

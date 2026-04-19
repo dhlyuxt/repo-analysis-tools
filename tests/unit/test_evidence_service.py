@@ -103,6 +103,18 @@ class EvidenceServiceTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "drifted"):
                 EvidenceService().build(repo, slice_manifest.slice_id)
 
+    def test_open_span_rejects_drifted_citation_after_pack_build(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            slice_manifest = SliceService().plan(repo, "Where is flash_init defined?", scan_snapshot.scan_id)
+            service = EvidenceService()
+            evidence_pack = service.build(repo, slice_manifest.slice_id)
+            (repo / "src" / "flash.c").write_text("int flash_init(void) { return 9; }\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ValueError, "drifted"):
+                service.open_span(repo, evidence_pack.evidence_pack_id, "src/flash.c", 1, 1)
+
     def test_read_snippet_falls_back_to_gb18030(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir) / "encoding-repo"

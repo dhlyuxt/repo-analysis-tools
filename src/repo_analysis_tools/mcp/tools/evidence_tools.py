@@ -49,7 +49,7 @@ def read_evidence_pack(target_repo: str, evidence_pack_id: str) -> dict[str, obj
             "citations": [citation.to_dict() for citation in evidence_pack.citations],
         },
         messages=["evidence pack loaded"],
-        recommended_next_tools=["open_span", "describe_anchor"],
+        recommended_next_tools=["open_span"],
     )
 
 
@@ -70,5 +70,5 @@ def open_span(target_repo: str, evidence_pack_id: str, path: str, line_start: in
             "lines": result.lines,
         },
         messages=["evidence span opened"],
-        recommended_next_tools=["read_evidence_pack", "describe_anchor"],
+        recommended_next_tools=["read_evidence_pack"],
     )

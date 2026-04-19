@@ -33,7 +33,7 @@ EVIDENCE_CONTRACTS = (
         },
         stable_ids=(StableIdKind.EVIDENCE_PACK,),
         failure_modes=(ErrorCode.INVALID_INPUT, ErrorCode.NOT_FOUND, ErrorCode.INTERNAL),
-        recommended_next_tools=("open_span", "describe_anchor"),
+        recommended_next_tools=("open_span",),
     ),
     ToolContract(
         name="open_span",
@@ -56,6 +56,6 @@ EVIDENCE_CONTRACTS = (
         },
         stable_ids=(StableIdKind.EVIDENCE_PACK,),
         failure_modes=(ErrorCode.INVALID_INPUT, ErrorCode.NOT_FOUND, ErrorCode.INTERNAL),
-        recommended_next_tools=("read_evidence_pack", "describe_anchor"),
+        recommended_next_tools=("read_evidence_pack",),
     ),
 )

@@ -47,8 +47,28 @@ The supported persistence model is JSON-first and domain-owned. Each scan writes
 - `anchors` stores extracted anchors and anchor relations.
 - `slice` stores slice manifests and slice inspection state.
 - `evidence` stores evidence packs and the citations they reopen.
+- `impact` stores persisted impact results and the latest impact pointer.
 
 `open_span` is intentionally bounded. It may only open a span that is fully covered by an evidence citation, and it must still respect `MAX_OPEN_SPAN_LINES` from the evidence service. It is not a generic file browser and must not be used to inspect arbitrary repository text outside the cited evidence path.
+
+## M3 Change-Impact Handoff
+
+M3 makes the change-impact path real for Codex sessions:
+
+```text
+refresh_scan
+-> impact_from_paths / impact_from_anchor
+-> summarize_impact
+-> inspect related anchors or slices
+-> build_evidence_pack
+```
+
+The persisted impact artifacts live under `<target_repo>/.codewiki/impact/`:
+
+- `latest.json` stores the latest impact pointer.
+- `results/impact_<12-hex>.json` stores the full impact record for later summary and evidence handoff.
+
+This handoff is intentionally conservative. Clients must distinguish confirmed impact, likely propagation, and blind spots instead of collapsing them into one certainty bucket.
 
 ## Runtime Root And Path Rules
 
@@ -68,6 +88,7 @@ M1 reserves these stable ID prefixes for reusable artifacts:
 | --- | --- | --- |
 | scan handle | `scan_` | Used for scan lifecycle and scan-derived reads. |
 | slice handle | `slice_` | Used for slice planning and later expansion. |
+| impact result | `impact_` | Used for persisted change-impact records and summaries. |
 | evidence pack | `evidence_pack_` | Used to reopen evidence and source spans. |
 | report payload | `report_` | Used for rendered reports before export. |
 | export bundle | `export_` | Used for exported snapshots and bundles. |

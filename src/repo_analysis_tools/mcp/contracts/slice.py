@@ -17,7 +17,7 @@ SLICE_CONTRACTS = (
             "status": "string",
             "selected_files": "list",
             "selected_anchor_names": "list",
-            "notes": "string",
+            "notes": "list",
         },
         stable_ids=(StableIdKind.SLICE,),
         failure_modes=(ErrorCode.INVALID_INPUT, ErrorCode.NOT_FOUND, ErrorCode.INTERNAL),

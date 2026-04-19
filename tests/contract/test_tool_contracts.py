@@ -264,17 +264,9 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(plan_payload["data"]["status"], "complete")
             self.assertEqual(plan_payload["data"]["selected_files"], ["src/flash.c"])
             self.assertEqual(plan_payload["data"]["selected_anchor_names"], ["flash_init"])
+            self.assertEqual(plan_payload["data"]["notes"], ["Located definition candidates for flash_init."])
             self.assertNotIn("M1", plan_payload["messages"][0]["text"])
-            self.assertEqual(
-                inspect_payload["data"]["members"],
-                [
-                    {
-                        "path": "src/flash.c",
-                        "anchor_names": ["flash_init"],
-                        "reason": "locate_symbol",
-                    }
-                ],
-            )
+            self.assertEqual(inspect_payload["data"]["members"], ["src/flash.c"])
             self.assertEqual(expand_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
             self.assertFalse(expand_payload["data"]["expanded"])
 

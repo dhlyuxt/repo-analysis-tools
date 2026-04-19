@@ -29,35 +29,35 @@ class SliceService:
         anchor_snapshot = AnchorStore.for_repo(repo).load(scan_id=scan_snapshot.scan_id)
 
         selected_anchors: list[AnchorRecord]
-        notes: str
+        notes: list[str]
         status = "complete"
 
         if classification.query_kind == "locate_symbol" and classification.symbol_name is not None:
             resolution = self.seed_resolver.resolve_symbol(repo, scan_snapshot.scan_id, classification.symbol_name)
             selected_anchors = self._definition_anchors(resolution.exact_matches)
             if selected_anchors:
-                notes = f"Located definition candidates for {classification.symbol_name}."
+                notes = [f"Located definition candidates for {classification.symbol_name}."]
             else:
                 status = "no_match"
                 notes = self._no_match_notes(classification.symbol_name, resolution.close_matches)
         elif classification.query_kind == "init_flow":
             selected_anchors = self._resolve_init_flow_anchors(anchor_snapshot.anchors)
             if selected_anchors:
-                notes = "Selected entrypoint and init routines for startup flow inspection."
+                notes = ["Selected entrypoint and init routines for startup flow inspection."]
             else:
                 status = "no_match"
-                notes = "No startup-related anchors were found in the scanned repository."
+                notes = ["No startup-related anchors were found in the scanned repository."]
         elif classification.query_kind == "file_role" and classification.subject is not None:
             selected_anchors = self._resolve_subject_path_anchors(anchor_snapshot.anchors, classification.subject)
             if selected_anchors:
-                notes = f"Selected anchors associated with {classification.subject}."
+                notes = [f"Selected anchors associated with {classification.subject}."]
             else:
                 status = "no_match"
-                notes = f"No anchors were associated with {classification.subject}."
+                notes = [f"No anchors were associated with {classification.subject}."]
         else:
             selected_anchors = []
             status = "no_match"
-            notes = "No targeted slice heuristic matched this question yet."
+            notes = ["No targeted slice heuristic matched this question yet."]
 
         manifest = SliceManifest(
             slice_id=make_stable_id(StableIdKind.SLICE),
@@ -80,7 +80,7 @@ class SliceService:
         return SliceInspection(
             target_repo=repo.as_posix(),
             slice_id=manifest.slice_id,
-            members=[member.to_dict() for member in manifest.members],
+            members=[member.path for member in manifest.members],
         )
 
     def expand(self, target_repo: Path | str, slice_id: str) -> SliceExpansion:
@@ -142,8 +142,8 @@ class SliceService:
             for path, anchor_names in sorted(member_anchor_names.items())
         ]
 
-    def _no_match_notes(self, symbol_name: str, close_matches: list[str]) -> str:
+    def _no_match_notes(self, symbol_name: str, close_matches: list[str]) -> list[str]:
         if not close_matches:
-            return f"No exact anchor match was found for {symbol_name}."
+            return [f"No exact anchor match was found for {symbol_name}."]
         suggestions = ", ".join(close_matches)
-        return f"No exact anchor match was found for {symbol_name}. Close matches: {suggestions}."
+        return [f"No exact anchor match was found for {symbol_name}. Close matches: {suggestions}."]

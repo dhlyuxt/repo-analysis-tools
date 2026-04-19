@@ -52,7 +52,7 @@ class SliceManifest:
     selected_files: list[str]
     selected_anchor_names: list[str]
     members: list[SliceMember]
-    notes: str
+    notes: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,7 +65,7 @@ class SliceManifest:
             "selected_files": list(self.selected_files),
             "selected_anchor_names": list(self.selected_anchor_names),
             "members": [member.to_dict() for member in self.members],
-            "notes": self.notes,
+            "notes": list(self.notes),
         }
 
     @classmethod
@@ -80,7 +80,7 @@ class SliceManifest:
             selected_files=[str(item) for item in payload.get("selected_files", [])],
             selected_anchor_names=[str(item) for item in payload.get("selected_anchor_names", [])],
             members=[SliceMember.from_dict(item) for item in payload.get("members", [])],
-            notes=str(payload.get("notes", "")),
+            notes=[str(item) for item in payload.get("notes", [])],
         )
 
 
@@ -88,7 +88,7 @@ class SliceManifest:
 class SliceInspection:
     target_repo: str
     slice_id: str
-    members: list[dict[str, Any]]
+    members: list[str]
 
 
 @dataclass(frozen=True)

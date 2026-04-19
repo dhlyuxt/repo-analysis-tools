@@ -93,6 +93,9 @@ class ToolContractsTest(unittest.TestCase):
             "list_anchors",
             "find_anchor",
             "describe_anchor",
+            "plan_slice",
+            "expand_slice",
+            "inspect_slice",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
@@ -120,6 +123,13 @@ class ToolContractsTest(unittest.TestCase):
                 return find_anchor(target_repo, "main", created["data"]["scan_id"])
             if contract_name == "describe_anchor":
                 return describe_anchor(target_repo, "main", created["data"]["scan_id"])
+            if contract_name == "plan_slice":
+                return slice_tools.plan_slice(target_repo, "Where is flash_init defined?")
+            planned = slice_tools.plan_slice(target_repo, "Where is flash_init defined?")
+            if contract_name == "expand_slice":
+                return slice_tools.expand_slice(target_repo, planned["data"]["slice_id"])
+            if contract_name == "inspect_slice":
+                return slice_tools.inspect_slice(target_repo, planned["data"]["slice_id"])
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -239,6 +249,34 @@ class ToolContractsTest(unittest.TestCase):
                 "direct_call",
                 {relation["kind"] for relation in describe_payload["data"]["relations"]},
             )
+
+    def test_slice_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            inspect_payload = slice_tools.inspect_slice(str(repo), plan_payload["data"]["slice_id"])
+            expand_payload = slice_tools.expand_slice(str(repo), plan_payload["data"]["slice_id"])
+
+            self.assertEqual(plan_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertEqual(plan_payload["data"]["query_kind"], "locate_symbol")
+            self.assertEqual(plan_payload["data"]["status"], "complete")
+            self.assertEqual(plan_payload["data"]["selected_files"], ["src/flash.c"])
+            self.assertEqual(plan_payload["data"]["selected_anchor_names"], ["flash_init"])
+            self.assertNotIn("M1", plan_payload["messages"][0]["text"])
+            self.assertEqual(
+                inspect_payload["data"]["members"],
+                [
+                    {
+                        "path": "src/flash.c",
+                        "anchor_names": ["flash_init"],
+                        "reason": "locate_symbol",
+                    }
+                ],
+            )
+            self.assertEqual(expand_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
+            self.assertFalse(expand_payload["data"]["expanded"])
 
     def test_describe_anchor_reports_direct_call_relation_for_easyflash_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

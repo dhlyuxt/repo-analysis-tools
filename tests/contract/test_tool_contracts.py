@@ -70,7 +70,11 @@ TOOL_CALL_KWARGS = {
     "impact_from_paths": {"target_repo": "/tmp/demo-repo", "paths": ["src/main.c"]},
     "impact_from_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
     "summarize_impact": {"target_repo": "/tmp/demo-repo", "impact_id": "impact_000000000001"},
-    "render_focus_report": {"target_repo": "/tmp/demo-repo", "evidence_pack_id": "evidence_pack_000000000001"},
+    "render_focus_report": {
+        "target_repo": "/tmp/demo-repo",
+        "evidence_pack_id": "evidence_pack_000000000001",
+        "document_type": "review-report",
+    },
     "render_module_summary": {
         "target_repo": "/tmp/demo-repo",
         "evidence_pack_id": "evidence_pack_000000000001",
@@ -120,6 +124,9 @@ class ToolContractsTest(unittest.TestCase):
             "impact_from_paths",
             "impact_from_anchor",
             "summarize_impact",
+            "render_focus_report",
+            "render_module_summary",
+            "render_analysis_outline",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
@@ -182,6 +189,20 @@ class ToolContractsTest(unittest.TestCase):
                     target_repo,
                     impact_payload["data"]["impact_id"],
                 )
+            if contract_name == "render_focus_report":
+                return report_tools.render_focus_report(
+                    target_repo,
+                    evidence_pack["data"]["evidence_pack_id"],
+                    "review-report",
+                )
+            if contract_name == "render_module_summary":
+                return report_tools.render_module_summary(
+                    target_repo,
+                    evidence_pack["data"]["evidence_pack_id"],
+                    "flash",
+                )
+            if contract_name == "render_analysis_outline":
+                return report_tools.render_analysis_outline(target_repo, "entrypoint")
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -216,7 +237,9 @@ class ToolContractsTest(unittest.TestCase):
             for field_name, schema in contract.input_schema.items():
                 parameter = signature.parameters[field_name]
                 is_nullable = schema.endswith("|null")
-                if is_nullable:
+                if contract_name == "render_focus_report" and field_name == "document_type":
+                    self.assertEqual(parameter.default, "review-report", f"{contract_name}:{field_name}")
+                elif is_nullable:
                     self.assertIsNot(parameter.default, inspect._empty, f"{contract_name}:{field_name}")
                 else:
                     self.assertIs(parameter.default, inspect._empty, f"{contract_name}:{field_name}")
@@ -396,6 +419,28 @@ class ToolContractsTest(unittest.TestCase):
                 summary_payload["recommended_next_tools"],
                 ["plan_slice", "build_evidence_pack"],
             )
+
+    def test_report_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+
+            module_payload = report_tools.render_module_summary(
+                str(repo),
+                build_payload["data"]["evidence_pack_id"],
+                "flash",
+            )
+            focus_payload = report_tools.render_focus_report(
+                str(repo),
+                build_payload["data"]["evidence_pack_id"],
+                "issue-analysis",
+            )
+
+            self.assertEqual(module_payload["data"]["document_type"], "module-summary")
+            self.assertIn("markdown_path", module_payload["data"])
+            self.assertEqual(focus_payload["data"]["document_type"], "issue-analysis")
 
     def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

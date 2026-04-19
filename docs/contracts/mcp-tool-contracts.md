@@ -104,9 +104,9 @@ Contract consumers should treat `read_evidence_pack` as the handoff point from s
 
 | Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
 | --- | --- | --- | --- | --- | --- |
-| `render_focus_report` | `target_repo`, `evidence_pack_id` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_module_summary`, `export_analysis_bundle` |
-| `render_module_summary` | `target_repo`, `evidence_pack_id`, `module_name` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_analysis_outline`, `export_analysis_bundle` |
-| `render_analysis_outline` | `target_repo`, `focus` | `target_repo`, `runtime_root`, `report_id`, `sections` | `report` | `invalid_input`, `not_found`, `internal` | `export_analysis_bundle`, `export_scope_snapshot` |
+| `render_focus_report` | `target_repo`, `evidence_pack_id`, `document_type` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id`, `document_type`, `title`, `markdown_path` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_module_summary`, `export_analysis_bundle` |
+| `render_module_summary` | `target_repo`, `evidence_pack_id`, `module_name` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id`, `document_type`, `title`, `markdown_path` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_analysis_outline`, `export_analysis_bundle` |
+| `render_analysis_outline` | `target_repo`, `focus` | `target_repo`, `runtime_root`, `report_id`, `document_type`, `title`, `markdown_path`, `sections` | `report` | `invalid_input`, `not_found`, `internal` | `export_analysis_bundle`, `export_scope_snapshot` |
 
 ## `export`
 

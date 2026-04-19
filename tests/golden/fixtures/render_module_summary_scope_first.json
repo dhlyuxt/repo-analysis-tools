@@ -1,0 +1,23 @@
+{
+  "schema_version": "1",
+  "status": "ok",
+  "data": {
+    "target_repo": "<repo>",
+    "runtime_root": "<repo>/.codewiki",
+    "evidence_pack_id": "evidence_pack_000000000001",
+    "report_id": "report_000000000001",
+    "document_type": "module-summary",
+    "title": "Module Summary: flash",
+    "markdown_path": "<repo>/.codewiki/report/rendered/report_000000000001.md"
+  },
+  "messages": [
+    {
+      "level": "info",
+      "text": "module summary rendered"
+    }
+  ],
+  "recommended_next_tools": [
+    "render_analysis_outline",
+    "export_analysis_bundle"
+  ]
+}

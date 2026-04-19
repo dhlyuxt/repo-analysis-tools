@@ -101,8 +101,15 @@ class ScopeService:
         return parts[0]
 
     def _node_id(self, label: str) -> str:
-        normalized = re.sub(r"[^a-z0-9]+", "_", label.lower()).strip("_")
-        return f"scope_{normalized or 'root'}"
+        if not label:
+            return "scope_root"
+        encoded = "".join(
+            character
+            if character.isascii() and character.isalnum()
+            else f"_x{ord(character):02x}_"
+            for character in label
+        )
+        return f"scope_{encoded}"
 
     def _build_nodes(self, scoped_files: list[ScopedFile]) -> list[ScopeNode]:
         related_files_by_node: dict[str, list[str]] = defaultdict(list)

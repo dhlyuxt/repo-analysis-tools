@@ -14,11 +14,19 @@ def build_scope_edge_case_repo(tmp_path: Path) -> Path:
     repo = tmp_path / "scope-edge-case-repo"
     (repo / "support").mkdir(parents=True, exist_ok=True)
     (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "tests").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "tests").mkdir(parents=True, exist_ok=True)
+    (repo / "third-party").mkdir(parents=True, exist_ok=True)
+    (repo / "third_party").mkdir(parents=True, exist_ok=True)
 
     (repo / "main.c").write_text("int main(void) { return 0; }\n", encoding="utf-8")
     (repo / "config.h").write_text("#define ROOT_CONFIG 1\n", encoding="utf-8")
     (repo / "support" / "helper.c").write_text("int support_helper(void) { return 1; }\n", encoding="utf-8")
     (repo / "src" / "app.c").write_text("int app(void) { return 0; }\n", encoding="utf-8")
+    (repo / "tests" / "root_test.c").write_text("int root_test(void) { return 0; }\n", encoding="utf-8")
+    (repo / "src" / "tests" / "nested_test.c").write_text("int nested_test(void) { return 0; }\n", encoding="utf-8")
+    (repo / "third-party" / "demo.c").write_text("int third_party_dash(void) { return 0; }\n", encoding="utf-8")
+    (repo / "third_party" / "demo.c").write_text("int third_party_underscore(void) { return 0; }\n", encoding="utf-8")
     return repo
 
 
@@ -137,4 +145,40 @@ class ScopeServiceTest(unittest.TestCase):
             self.assertEqual(
                 {scoped_file.path: scoped_file.role for scoped_file in snapshot.files if scoped_file.path == "support/helper.c"},
                 {"support/helper.c": "support"},
+            )
+
+    def test_build_snapshot_excludes_root_and_nested_tests_directories(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_edge_case_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+
+            self.assertNotIn("tests/root_test.c", {scoped_file.path for scoped_file in snapshot.files})
+            self.assertNotIn("src/tests/nested_test.c", {scoped_file.path for scoped_file in snapshot.files})
+
+    def test_build_snapshot_keeps_distinct_node_ids_for_common_separator_variants(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_edge_case_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+            node_ids = {
+                node.label: node.node_id
+                for node in snapshot.nodes
+                if node.label in {"third-party", "third_party"}
+            }
+
+            self.assertEqual(set(node_ids), {"third-party", "third_party"})
+            self.assertNotEqual(node_ids["third-party"], node_ids["third_party"])
+            self.assertEqual(
+                {
+                    node.label: node.related_files
+                    for node in snapshot.nodes
+                    if node.label in {"third-party", "third_party"}
+                },
+                {
+                    "third-party": ["third-party/demo.c"],
+                    "third_party": ["third_party/demo.c"],
+                },
             )

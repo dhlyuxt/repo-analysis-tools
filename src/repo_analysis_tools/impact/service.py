@@ -34,6 +34,7 @@ class ImpactService:
             repo_root=repo.as_posix(),
             seed_kind="path",
             seed=ImpactTarget(path=normalized_paths[0], kind="path", reason="Path-seeded impact analysis"),
+            changed_paths=list(normalized_paths),
             confirmed_targets=[
                 ImpactTarget(path=path, kind="path", reason="Changed path supplied as direct impact seed")
                 for path in normalized_paths
@@ -55,7 +56,7 @@ class ImpactService:
     ) -> ImpactRecord:
         repo = Path(target_repo).expanduser().resolve()
         snapshot = self.anchor_service.load_snapshot(repo, scan_id=scan_id)
-        anchor = self._resolve_anchor(repo, anchor_name, snapshot.scan_id)
+        anchor = self._resolve_anchor(snapshot.anchors, anchor_name)
         propagation = reverse_callers_for_anchor(snapshot, anchor)
         record = ImpactRecord(
             impact_id=make_stable_id(StableIdKind.IMPACT),
@@ -63,6 +64,7 @@ class ImpactService:
             repo_root=repo.as_posix(),
             seed_kind="anchor",
             seed=self._target_from_anchor(anchor, "Anchor supplied as direct impact seed"),
+            changed_paths=[],
             confirmed_targets=[self._target_from_anchor(anchor, "Resolved anchor impact seed")],
             likely_propagation=propagation.targets,
             regression_focus=self._regression_focus([anchor.path], propagation.targets),
@@ -85,10 +87,9 @@ class ImpactService:
             risks=list(record.risks),
         )
 
-    def _resolve_anchor(self, target_repo: Path, anchor_name: str, scan_id: str) -> AnchorRecord:
-        validated_name = anchor_name.strip()
-        snapshot = self.anchor_service.load_snapshot(target_repo, scan_id=scan_id)
-        exact_matches = [anchor for anchor in snapshot.anchors if anchor.name == validated_name]
+    def _resolve_anchor(self, anchors: list[AnchorRecord], anchor_name: str) -> AnchorRecord:
+        validated_name = self._validated_anchor_name(anchor_name)
+        exact_matches = [anchor for anchor in anchors if anchor.name == validated_name]
         if not exact_matches:
             raise FileNotFoundError(f"anchor {validated_name} was not found")
 
@@ -106,6 +107,12 @@ class ImpactService:
         raise ValueError(
             f"anchor {validated_name} is ambiguous; disambiguate the requested anchor first"
         )
+
+    def _validated_anchor_name(self, anchor_name: str) -> str:
+        normalized = anchor_name.strip()
+        if not normalized:
+            raise ValueError("anchor_name must not be empty")
+        return normalized
 
     def _normalized_paths(self, target_repo: Path, changed_paths: list[str]) -> list[str]:
         normalized: list[str] = []

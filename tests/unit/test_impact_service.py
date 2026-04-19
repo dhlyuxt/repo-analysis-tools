@@ -16,6 +16,10 @@ def build_proven_call_repo(tmp_path: Path) -> Path:
         "int demo_main(void) { return flash_init(); }\n",
         encoding="utf-8",
     )
+    (repo / "src" / "config.h").write_text(
+        "#define FEATURE_FLAG 1\n",
+        encoding="utf-8",
+    )
     return repo
 
 
@@ -56,6 +60,23 @@ class ImpactServiceTest(unittest.TestCase):
             self.assertTrue(
                 any("bounded by available anchor relations" in note for note in stored.blind_spots)
             )
+
+    def test_from_paths_persists_full_changed_path_seed_set(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_proven_call_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            result = ImpactService().from_paths(
+                repo,
+                ["src/config.h", "src/impact.c", "src/config.h"],
+                scan_snapshot.scan_id,
+            )
+            stored = ImpactStore.for_repo(repo).load(result.impact_id)
+
+            self.assertEqual(stored.seed_kind, "path")
+            self.assertEqual(stored.changed_paths, ["src/config.h", "src/impact.c"])
+            self.assertEqual(stored.seed.path, "src/config.h")
+            self.assertEqual([target.path for target in stored.confirmed_targets], ["src/config.h", "src/impact.c"])
 
     def test_from_anchor_uses_anchor_seed_and_caller_propagation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -107,3 +128,11 @@ class ImpactServiceTest(unittest.TestCase):
                 "anchor flash_init is ambiguous; disambiguate the requested anchor first",
             ):
                 ImpactService().from_anchor(repo, "flash_init", scan_snapshot.scan_id)
+
+    def test_from_anchor_rejects_blank_anchor_name(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_proven_call_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            with self.assertRaisesRegex(ValueError, "anchor_name must not be empty"):
+                ImpactService().from_anchor(repo, "   ", scan_snapshot.scan_id)

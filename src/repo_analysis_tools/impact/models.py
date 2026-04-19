@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -67,6 +67,7 @@ class ImpactRecord:
     blind_spots: list[str]
     risks: list[RiskFinding]
     notes: list[str]
+    changed_paths: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -75,6 +76,7 @@ class ImpactRecord:
             "repo_root": self.repo_root,
             "seed_kind": self.seed_kind,
             "seed": self.seed.to_dict(),
+            "changed_paths": list(self.changed_paths),
             "confirmed_targets": [target.to_dict() for target in self.confirmed_targets],
             "likely_propagation": [target.to_dict() for target in self.likely_propagation],
             "regression_focus": list(self.regression_focus),
@@ -91,6 +93,7 @@ class ImpactRecord:
             repo_root=str(payload["repo_root"]),
             seed_kind=str(payload["seed_kind"]),
             seed=ImpactTarget.from_dict(payload["seed"]),
+            changed_paths=[str(item) for item in payload.get("changed_paths", [])],
             confirmed_targets=[
                 ImpactTarget.from_dict(item) for item in payload.get("confirmed_targets", [])
             ],

@@ -30,7 +30,15 @@ EXPECTED_DIRECTORIES = [
     ROOT / "docs" / "contracts",
 ]
 EXPECTED_FILES = [
+    ROOT / ".codex" / "config.toml",
+    ROOT / ".mcp.json",
     ROOT / ".agents" / "skills" / "analysis-maintenance" / "SKILL.md",
+    ROOT / ".claude" / "skills" / "repo-understand" / "SKILL.md",
+    ROOT / ".claude" / "skills" / "change-impact" / "SKILL.md",
+    ROOT / ".claude" / "skills" / "analysis-writing" / "SKILL.md",
+    ROOT / ".claude" / "skills" / "analysis-maintenance" / "SKILL.md",
+    ROOT / "docs" / "self-use-launch.md",
+    ROOT / "tools" / "run_self_use_demo.py",
 ]
 
 

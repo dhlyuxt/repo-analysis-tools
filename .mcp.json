@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "repo-analysis-tools": {
+      "command": "/home/hyx/anaconda3/envs/agent/bin/python",
+      "args": ["-m", "repo_analysis_tools.mcp.server"]
+    }
+  }
+}

@@ -24,6 +24,9 @@ EXPECTED_DIRECTORIES = [
     ROOT / "tests" / "unit",
     ROOT / "tests" / "contract",
     ROOT / "tests" / "golden" / "fixtures",
+    ROOT / "tests" / "fixtures",
+    ROOT / "tests" / "integration",
+    ROOT / "tests" / "e2e",
     ROOT / "docs" / "contracts",
 ]
 

@@ -83,7 +83,7 @@ def _run_validator_process(node_binary: str, payload: str) -> subprocess.Complet
             check=False,
             timeout=SUBPROCESS_TIMEOUT_SECONDS,
         )
-    except FileNotFoundError as exc:
+    except OSError as exc:
         raise MermaidSyntaxError(f"Mermaid syntax error: could not start node process: {exc}") from exc
     except subprocess.TimeoutExpired as exc:
         raise MermaidSyntaxError("Mermaid syntax error: validator process timed out") from exc

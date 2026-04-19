@@ -39,6 +39,17 @@ class MermaidValidatorTest(unittest.TestCase):
 
         self.assertIn("could not start node process", str(context.exception))
 
+    def test_validate_raises_syntax_error_when_node_start_fails_with_oserror(self) -> None:
+        with patch(
+            "repo_analysis_tools.doc_dsl.mermaid_validator.subprocess.run",
+            side_effect=PermissionError("permission denied"),
+        ):
+            with self.assertRaises(MermaidSyntaxError) as context:
+                MermaidValidator(node_binary="node").validate("flowchart LR\nA-->B\n", diagram_kind="flowchart")
+
+        self.assertIn("could not start node process", str(context.exception))
+        self.assertIn("permission denied", str(context.exception))
+
     def test_validate_raises_syntax_error_when_node_emits_invalid_json(self) -> None:
         with patch(
             "repo_analysis_tools.doc_dsl.mermaid_validator.subprocess.run",

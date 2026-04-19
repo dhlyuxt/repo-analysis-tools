@@ -6,6 +6,7 @@ import uuid
 class StableIdKind(StrEnum):
     SCAN = "scan"
     SLICE = "slice"
+    IMPACT = "impact"
     EVIDENCE_PACK = "evidence_pack"
     REPORT = "report"
     EXPORT = "export"

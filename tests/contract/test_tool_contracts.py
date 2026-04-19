@@ -6,6 +6,7 @@ from pathlib import Path
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
 from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor, list_anchors
+from repo_analysis_tools.mcp.tools.evidence_tools import build_evidence_pack, open_span, read_evidence_pack
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
 from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
@@ -96,6 +97,9 @@ class ToolContractsTest(unittest.TestCase):
             "plan_slice",
             "expand_slice",
             "inspect_slice",
+            "build_evidence_pack",
+            "read_evidence_pack",
+            "open_span",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
@@ -130,6 +134,19 @@ class ToolContractsTest(unittest.TestCase):
                 return slice_tools.expand_slice(target_repo, planned["data"]["slice_id"])
             if contract_name == "inspect_slice":
                 return slice_tools.inspect_slice(target_repo, planned["data"]["slice_id"])
+            if contract_name == "build_evidence_pack":
+                return build_evidence_pack(target_repo, planned["data"]["slice_id"])
+            evidence_pack = build_evidence_pack(target_repo, planned["data"]["slice_id"])
+            if contract_name == "read_evidence_pack":
+                return read_evidence_pack(target_repo, evidence_pack["data"]["evidence_pack_id"])
+            if contract_name == "open_span":
+                return open_span(
+                    target_repo,
+                    evidence_pack["data"]["evidence_pack_id"],
+                    "src/flash.c",
+                    1,
+                    1,
+                )
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -279,6 +296,36 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(inspect_payload["data"]["members"], ["src/flash.c"])
             self.assertEqual(expand_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
             self.assertFalse(expand_payload["data"]["expanded"])
+
+    def test_evidence_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+            read_payload = read_evidence_pack(str(repo), build_payload["data"]["evidence_pack_id"])
+            open_payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 1)
+
+            self.assertEqual(build_payload["status"], "ok")
+            self.assertEqual(build_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
+            self.assertEqual(build_payload["data"]["citation_count"], 1)
+            self.assertEqual(read_payload["data"]["citations"][0]["file_path"], "src/flash.c")
+            self.assertEqual(open_payload["data"]["line_start"], 1)
+            self.assertEqual(open_payload["data"]["line_end"], 1)
+            self.assertEqual(open_payload["data"]["lines"], ["int flash_init(void) { return 0; }"])
+
+    def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+
+            payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 2)
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
 
     def test_describe_anchor_reports_direct_call_relation_for_easyflash_fixture(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

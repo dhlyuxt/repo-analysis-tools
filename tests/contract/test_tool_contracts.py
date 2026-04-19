@@ -1,11 +1,14 @@
 import inspect
+import tempfile
 import unittest
+from pathlib import Path
 
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
-from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status
+from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, scan_repo
 from repo_analysis_tools.mcp.tools.shared import stub_payload
+from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 EXPECTED_DOMAINS = {
@@ -76,6 +79,24 @@ TOOL_CALL_KWARGS = {
 
 
 class ToolContractsTest(unittest.TestCase):
+    def _invoke_tool(self, contract_name: str) -> dict:
+        if contract_name not in {"scan_repo", "refresh_scan", "get_scan_status"}:
+            return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            target_repo = str(repo)
+            if contract_name == "scan_repo":
+                return scan_repo(target_repo)
+
+            created = scan_repo(target_repo)
+            if contract_name == "refresh_scan":
+                return TOOL_BY_NAME[contract_name](
+                    target_repo=target_repo,
+                    scan_id=created["data"]["scan_id"],
+                )
+            return TOOL_BY_NAME[contract_name](target_repo=target_repo)
+
     def test_every_required_domain_group_exists(self) -> None:
         self.assertEqual(set(DOMAIN_CONTRACTS), EXPECTED_DOMAINS)
         for domain_name, contracts in DOMAIN_CONTRACTS.items():
@@ -92,7 +113,7 @@ class ToolContractsTest(unittest.TestCase):
 
     def test_every_contract_has_callable_stub_tool(self) -> None:
         for contract_name in CONTRACT_BY_NAME:
-            payload = TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
+            payload = self._invoke_tool(contract_name)
             self.assertEqual(payload["status"], "ok", contract_name)
 
     def test_tool_signatures_match_contract_input_schemas(self) -> None:
@@ -109,7 +130,7 @@ class ToolContractsTest(unittest.TestCase):
 
     def test_stub_output_data_keys_match_declared_output_schema(self) -> None:
         for contract_name, contract in CONTRACT_BY_NAME.items():
-            payload = TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
+            payload = self._invoke_tool(contract_name)
             self.assertEqual(set(payload["data"]), set(contract.output_schema), contract_name)
 
     def test_scan_repo_stub_uses_standard_envelope(self) -> None:
@@ -124,15 +145,33 @@ class ToolContractsTest(unittest.TestCase):
         self.assertEqual(payload["recommended_next_tools"], ["get_scan_status", "show_scope"])
 
     def test_scan_backed_stubs_generate_declared_scan_id_when_omitted(self) -> None:
-        scan_status_payload = get_scan_status("/tmp/demo-repo")
-        export_payload = export_scope_snapshot("/tmp/demo-repo")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            scan_status_payload = get_scan_status(str(repo))
+            export_payload = export_scope_snapshot("/tmp/demo-repo")
 
         self.assertRegex(scan_status_payload["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
         self.assertRegex(export_payload["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
 
     def test_stub_outputs_do_not_include_undeclared_contract_version(self) -> None:
         payload = stub_payload("get_scan_status", target_repo="/tmp/demo-repo")
-        tool_payload = get_scan_status("/tmp/demo-repo")
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            tool_payload = get_scan_status(str(repo))
 
         self.assertNotIn("contract_version", payload["data"])
         self.assertNotIn("contract_version", tool_payload["data"])
+
+    def test_scan_repo_and_get_scan_status_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+            status = get_scan_status(str(repo))
+
+            self.assertEqual(created["data"]["file_count"], 6)
+            self.assertEqual(
+                status["data"]["latest_completed_at"],
+                created["data"]["latest_completed_at"],
+            )

@@ -6,6 +6,7 @@ from repo_analysis_tools.core.errors import ErrorCode
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.scan.service import ScanService
 from repo_analysis_tools.scan.store import ScanStore
+from tests.fixtures.git_helpers import init_git_fixture
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
@@ -51,3 +52,50 @@ class ScanServiceTest(unittest.TestCase):
             self.assertEqual(refreshed["status"], "ok")
             self.assertNotEqual(refreshed["data"]["scan_id"], created["data"]["scan_id"])
             self.assertEqual(status["data"]["scan_id"], refreshed["data"]["scan_id"])
+
+    def test_refresh_scan_rejects_malformed_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = refresh_scan(str(repo), "../escape")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
+
+    def test_get_scan_status_rejects_malformed_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = get_scan_status(str(repo), "../escape")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
+
+    def test_get_scan_status_returns_not_found_when_repo_has_no_scans(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = get_scan_status(str(repo))
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
+
+    def test_get_scan_status_returns_not_found_for_missing_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+
+            payload = get_scan_status(str(repo), "scan_deadbeefcafe")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
+
+    def test_scan_service_marks_workspace_dirty_for_untracked_file(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            init_git_fixture(repo)
+            (repo / "notes.txt").write_text("untracked\n", encoding="utf-8")
+
+            snapshot = ScanService().scan(repo)
+
+            self.assertTrue(snapshot.workspace_dirty)

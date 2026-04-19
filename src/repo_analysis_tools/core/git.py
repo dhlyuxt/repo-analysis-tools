@@ -13,7 +13,7 @@ def detect_git_provenance(repo: Path) -> tuple[str | None, bool | None]:
         ).stdout.strip()
         dirty = bool(
             subprocess.run(
-                ["git", "status", "--porcelain", "--untracked-files=no"],
+                ["git", "status", "--porcelain"],
                 cwd=repo,
                 capture_output=True,
                 text=True,

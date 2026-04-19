@@ -37,7 +37,7 @@ TOOL_BY_NAME = {
     name: tool
     for module in TOOL_MODULES
     for name, tool in inspect.getmembers(module, inspect.isfunction)
-    if tool.__module__ == module.__name__
+    if tool.__module__ == module.__name__ and not name.startswith("_")
 }
 
 TOOL_CALL_KWARGS = {
@@ -185,3 +185,30 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], "not_found")
             self.assertEqual(payload["recommended_next_tools"], [])
+
+    def test_refresh_scan_rejects_malformed_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = refresh_scan(str(repo), "../escape")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+
+    def test_get_scan_status_returns_error_when_no_scan_exists(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = get_scan_status(str(repo))
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "not_found")
+
+    def test_get_scan_status_rejects_malformed_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = get_scan_status(str(repo), "../escape")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")

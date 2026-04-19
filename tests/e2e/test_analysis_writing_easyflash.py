@@ -24,5 +24,8 @@ class AnalysisWritingEasyflashTest(unittest.TestCase):
             )
             markdown = Path(payload["data"]["markdown_path"]).read_text(encoding="utf-8")
 
+            self.assertEqual(payload["data"]["document_type"], "module-summary")
+            self.assertIn("# Module Summary: easyflash", markdown)
+            self.assertIn("## Call Flow", markdown)
             self.assertIn("```mermaid", markdown)
             self.assertIn("easyflash_init", markdown)

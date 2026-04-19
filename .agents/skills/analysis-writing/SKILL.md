@@ -18,7 +18,7 @@ scan_repo / refresh_scan
 
 ## Output Rules
 
-- Choose an explicit document type before rendering.
+- Choose an explicit document type before rendering. Use `render_focus_report` when the evidence-backed output should be either `issue-analysis` or `review-report`; it exposes the `document_type` dimension explicitly.
 - Keep document generation MCP-first: do not hand-write Markdown that bypasses report tools.
 - Treat the returned `markdown_path` as the final artifact location.
 - Distinguish findings, interpretation, unknowns, and recommendations in the final answer.

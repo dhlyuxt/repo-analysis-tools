@@ -21,6 +21,13 @@ class ScanStore:
     def load_latest(self) -> ScanSnapshot:
         return self.load()
 
+    def exists(self, scan_id: str) -> bool:
+        try:
+            self.assets.read_json(f"snapshots/{scan_id}.json")
+        except FileNotFoundError:
+            return False
+        return True
+
     def load(self, scan_id: str | None = None) -> ScanSnapshot:
         resolved_scan_id = scan_id or str(self.assets.read_json("latest.json")["scan_id"])
         payload = self.assets.read_json(f"snapshots/{resolved_scan_id}.json")

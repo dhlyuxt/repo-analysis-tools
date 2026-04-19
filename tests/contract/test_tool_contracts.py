@@ -6,7 +6,7 @@ from pathlib import Path
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
-from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, scan_repo
+from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.mcp.tools.shared import stub_payload
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
@@ -175,3 +175,13 @@ class ToolContractsTest(unittest.TestCase):
                 status["data"]["latest_completed_at"],
                 created["data"]["latest_completed_at"],
             )
+
+    def test_refresh_scan_returns_error_for_unknown_scan_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            payload = refresh_scan(str(repo), "scan_deadbeefcafe")
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "not_found")
+            self.assertEqual(payload["recommended_next_tools"], [])

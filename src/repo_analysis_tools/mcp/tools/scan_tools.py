@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from repo_analysis_tools.core.errors import ok_response
+from repo_analysis_tools.core.errors import ErrorCode, error_response, ok_response
 from repo_analysis_tools.core.paths import runtime_root
 from repo_analysis_tools.mcp.app import mcp
 from repo_analysis_tools.scan.service import ScanService
@@ -28,6 +28,12 @@ def scan_repo(target_repo: str) -> dict[str, object]:
 
 @mcp.tool()
 def refresh_scan(target_repo: str, scan_id: str) -> dict[str, object]:
+    store = ScanStore.for_repo(target_repo)
+    if not store.exists(scan_id):
+        return error_response(
+            ErrorCode.NOT_FOUND,
+            f"scan {scan_id} was not found",
+        )
     snapshot = ScanService().scan(target_repo)
     return ok_response(
         data={

@@ -13,7 +13,7 @@ from repo_analysis_tools.scope.store import ScopeStore
 
 class ScopeService:
     PRIMARY_HINTS = {"src", "source", "lib", "include", "app", "core"}
-    SUPPORT_HINTS = {"ports", "port", "board", "bsp", "platform", "hal"}
+    SUPPORT_HINTS = {"ports", "port", "board", "bsp", "platform", "hal", "support"}
     EXTERNAL_HINTS = {"demo", "vendor", "third_party", "third-party", "examples"}
     GENERATED_HINTS = {"generated", "autogen", "gen"}
     ROLE_ORDER = ("primary", "support", "external", "generated")

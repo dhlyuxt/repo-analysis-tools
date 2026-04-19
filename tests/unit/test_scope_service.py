@@ -10,6 +10,18 @@ from repo_analysis_tools.scope.store import ScopeStore
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
+def build_scope_edge_case_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "scope-edge-case-repo"
+    (repo / "support").mkdir(parents=True, exist_ok=True)
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+
+    (repo / "main.c").write_text("int main(void) { return 0; }\n", encoding="utf-8")
+    (repo / "config.h").write_text("#define ROOT_CONFIG 1\n", encoding="utf-8")
+    (repo / "support" / "helper.c").write_text("int support_helper(void) { return 1; }\n", encoding="utf-8")
+    (repo / "src" / "app.c").write_text("int app(void) { return 0; }\n", encoding="utf-8")
+    return repo
+
+
 class ScopeServiceTest(unittest.TestCase):
     def test_build_snapshot_classifies_expected_roles_and_persists_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -100,3 +112,29 @@ class ScopeServiceTest(unittest.TestCase):
 
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
+
+    def test_build_snapshot_includes_root_level_c_and_h_files(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_edge_case_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+
+            self.assertIn("main.c", {scoped_file.path for scoped_file in snapshot.files})
+            self.assertIn("config.h", {scoped_file.path for scoped_file in snapshot.files})
+            self.assertEqual(
+                {scoped_file.path: scoped_file.role for scoped_file in snapshot.files if scoped_file.path in {"main.c", "config.h"}},
+                {"main.c": "primary", "config.h": "primary"},
+            )
+
+    def test_build_snapshot_classifies_support_directory_as_support(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_edge_case_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+
+            self.assertEqual(
+                {scoped_file.path: scoped_file.role for scoped_file in snapshot.files if scoped_file.path == "support/helper.c"},
+                {"support/helper.c": "support"},
+            )

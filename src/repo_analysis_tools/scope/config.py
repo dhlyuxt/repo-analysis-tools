@@ -18,7 +18,7 @@ class ScopeConfigLoader:
         "focus_roots": ("src",),
         "external_roots": ("vendor", "third_party", "demo"),
         "ignore_roots": ("build", "generated"),
-        "include_globs": ("**/*.c", "**/*.h"),
+        "include_globs": ("*.c", "*.h", "**/*.c", "**/*.h"),
         "exclude_globs": ("**/tests/**",),
     }
 

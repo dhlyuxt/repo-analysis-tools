@@ -22,19 +22,19 @@ class MermaidBlock:
     source: str
     caption: str
     placement: str
-    evidence_bindings: tuple[EvidenceBinding, ...]
+    evidence_bindings: list[EvidenceBinding]
     title: str | None = None
 
 
 @dataclass(frozen=True)
 class Section:
     title: str
-    blocks: tuple[TextBlock | MermaidBlock, ...]
+    blocks: list[TextBlock | MermaidBlock]
 
 
 @dataclass(frozen=True)
 class Document:
     document_type: str
     title: str
-    sections: tuple[Section, ...]
+    sections: list[Section]
     metadata: dict[str, str] = field(default_factory=dict)

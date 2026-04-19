@@ -2,6 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from repo_analysis_tools.anchors.store import AnchorStore
 from repo_analysis_tools.core.errors import ErrorCode
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.scan.service import ScanService
@@ -20,6 +21,16 @@ class ScanServiceTest(unittest.TestCase):
             self.assertEqual(stored.scan_id, result.scan_id)
             self.assertEqual(stored.file_count, 6)
             self.assertEqual(stored.repo_root, str(repo.resolve()))
+
+    def test_scan_service_persists_anchor_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            result = ScanService().scan(repo)
+            stored = AnchorStore.for_repo(repo).load(result.scan_id)
+
+            self.assertEqual(stored.scan_id, result.scan_id)
+            self.assertIn("main", {anchor.name for anchor in stored.anchors})
 
     def test_scan_tools_return_real_payloads(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

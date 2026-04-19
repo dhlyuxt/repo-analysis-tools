@@ -51,6 +51,7 @@ ANCHOR_CONTRACTS = (
             "scan_id": "scan_<12-hex>",
             "anchor_name": "string",
             "description": "string",
+            "relations": "list",
         },
         stable_ids=(StableIdKind.SCAN,),
         failure_modes=(ErrorCode.INVALID_INPUT, ErrorCode.NOT_FOUND, ErrorCode.INTERNAL),

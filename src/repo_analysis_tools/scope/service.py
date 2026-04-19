@@ -4,6 +4,7 @@ from collections import defaultdict
 from pathlib import Path, PurePosixPath
 import re
 
+from repo_analysis_tools.core.ids import make_scope_node_id
 from repo_analysis_tools.scan.models import ScannedFile
 from repo_analysis_tools.scan.store import ScanStore
 from repo_analysis_tools.scope.config import ScopeConfig, ScopeConfigLoader
@@ -101,15 +102,7 @@ class ScopeService:
         return parts[0]
 
     def _node_id(self, label: str) -> str:
-        if not label:
-            return "scope_root"
-        encoded = "".join(
-            character
-            if character.isascii() and character.isalnum()
-            else f"_x{ord(character):02x}_"
-            for character in label
-        )
-        return f"scope_{encoded}"
+        return make_scope_node_id(label)
 
     def _build_nodes(self, scoped_files: list[ScopedFile]) -> list[ScopeNode]:
         related_files_by_node: dict[str, list[str]] = defaultdict(list)

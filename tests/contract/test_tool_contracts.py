@@ -5,10 +5,12 @@ from pathlib import Path
 
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
+from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor, list_anchors
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
 from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.mcp.tools.shared import stub_payload
+from tests.fixtures.easyflash_repo import materialize_easyflash_repo
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
@@ -88,6 +90,9 @@ class ToolContractsTest(unittest.TestCase):
             "show_scope",
             "list_scope_nodes",
             "explain_scope_node",
+            "list_anchors",
+            "find_anchor",
+            "describe_anchor",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
@@ -109,6 +114,12 @@ class ToolContractsTest(unittest.TestCase):
                 return list_scope_nodes(target_repo, created["data"]["scan_id"])
             if contract_name == "explain_scope_node":
                 return explain_scope_node(target_repo, "scope_src", created["data"]["scan_id"])
+            if contract_name == "list_anchors":
+                return list_anchors(target_repo, created["data"]["scan_id"])
+            if contract_name == "find_anchor":
+                return find_anchor(target_repo, "main", created["data"]["scan_id"])
+            if contract_name == "describe_anchor":
+                return describe_anchor(target_repo, "main", created["data"]["scan_id"])
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -206,6 +217,46 @@ class ToolContractsTest(unittest.TestCase):
             )
             self.assertEqual(nodes_payload["data"]["nodes"][0]["node_id"], "scope_demo")
             self.assertEqual(explain_payload["data"]["related_files"][0], "src/config.h")
+
+    def test_anchor_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+
+            anchors_payload = list_anchors(str(repo), created["data"]["scan_id"])
+            find_payload = find_anchor(str(repo), "main", created["data"]["scan_id"])
+            describe_payload = describe_anchor(str(repo), "main", created["data"]["scan_id"])
+
+            self.assertEqual(anchors_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertTrue(
+                {"EF_USING_ENV", "flash_init", "main"}.issubset(
+                    {anchor["name"] for anchor in anchors_payload["data"]["anchors"]}
+                )
+            )
+            self.assertEqual(find_payload["data"]["matches"][0]["name"], "main")
+            self.assertEqual(describe_payload["data"]["anchor_name"], "main")
+            self.assertIn(
+                "direct_call",
+                {relation["kind"] for relation in describe_payload["data"]["relations"]},
+            )
+
+    def test_describe_anchor_reports_direct_call_relation_for_easyflash_fixture(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = materialize_easyflash_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+
+            payload = describe_anchor(str(repo), "easyflash_init", created["data"]["scan_id"])
+
+            self.assertEqual(payload["status"], "ok")
+            self.assertIn("easyflash/src/easyflash.c", payload["data"]["description"])
+            self.assertIn(
+                "ef_port_init",
+                {
+                    relation["target_name"]
+                    for relation in payload["data"]["relations"]
+                    if relation["kind"] == "direct_call"
+                },
+            )
 
     def test_refresh_scan_returns_error_for_unknown_scan_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

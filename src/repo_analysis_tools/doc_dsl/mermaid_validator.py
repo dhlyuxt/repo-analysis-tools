@@ -21,13 +21,11 @@ class MermaidValidationResult:
 
 
 class MermaidValidator:
-    def __init__(self, *, node_binary: str | None = None) -> None:
-        if node_binary is not None:
-            self.node_binary = node_binary
-        elif DEFAULT_NODE_BINARY.exists():
+    def __init__(self, node_binary: str = "node") -> None:
+        if node_binary == "node" and DEFAULT_NODE_BINARY.exists():
             self.node_binary = str(DEFAULT_NODE_BINARY)
         else:
-            self.node_binary = "node"
+            self.node_binary = node_binary
 
     def validate(self, source: str, *, diagram_kind: str | None = None) -> MermaidValidationResult:
         requested_kind = diagram_kind or _infer_diagram_kind(source)
@@ -46,10 +44,6 @@ class MermaidValidator:
         return MermaidValidationResult(
             diagram_type=_normalize_diagram_type(response.get("diagramType"), requested_kind)
         )
-
-
-def validate_mermaid(source: str, *, diagram_kind: str | None = None) -> MermaidValidationResult:
-    return MermaidValidator().validate(source, diagram_kind=diagram_kind)
 
 
 def _infer_diagram_kind(source: str) -> str | None:

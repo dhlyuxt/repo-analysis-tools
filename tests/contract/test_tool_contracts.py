@@ -8,6 +8,7 @@ from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_
 from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor, list_anchors
 from repo_analysis_tools.mcp.tools.evidence_tools import build_evidence_pack, open_span, read_evidence_pack
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
+from repo_analysis_tools.mcp.tools.impact_tools import impact_from_anchor, impact_from_paths, summarize_impact
 from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.mcp.tools.shared import stub_payload
@@ -68,7 +69,7 @@ TOOL_CALL_KWARGS = {
     },
     "impact_from_paths": {"target_repo": "/tmp/demo-repo", "paths": ["src/main.c"]},
     "impact_from_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
-    "summarize_impact": {"target_repo": "/tmp/demo-repo", "focus": "entrypoint"},
+    "summarize_impact": {"target_repo": "/tmp/demo-repo", "impact_id": "impact_000000000001"},
     "render_focus_report": {"target_repo": "/tmp/demo-repo", "evidence_pack_id": "evidence_pack_000000000001"},
     "render_module_summary": {
         "target_repo": "/tmp/demo-repo",
@@ -80,6 +81,22 @@ TOOL_CALL_KWARGS = {
     "export_scope_snapshot": {"target_repo": "/tmp/demo-repo"},
     "export_evidence_bundle": {"target_repo": "/tmp/demo-repo", "evidence_pack_id": "evidence_pack_000000000001"},
 }
+
+
+def build_proven_call_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "proven-call-repo"
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "impact.c").write_text(
+        "int flash_init(void) { return 0; }\n"
+        "int main(void) { return flash_init(); }\n"
+        "int demo_main(void) { return flash_init(); }\n",
+        encoding="utf-8",
+    )
+    (repo / "src" / "config.h").write_text(
+        "#define FEATURE_FLAG 1\n",
+        encoding="utf-8",
+    )
+    return repo
 
 
 class ToolContractsTest(unittest.TestCase):
@@ -100,11 +117,19 @@ class ToolContractsTest(unittest.TestCase):
             "build_evidence_pack",
             "read_evidence_pack",
             "open_span",
+            "impact_from_paths",
+            "impact_from_anchor",
+            "summarize_impact",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
+            repo_builder = (
+                build_proven_call_repo
+                if contract_name in {"impact_from_paths", "impact_from_anchor", "summarize_impact"}
+                else build_scope_first_repo
+            )
+            repo = repo_builder(Path(tmpdir))
             target_repo = str(repo)
             if contract_name == "scan_repo":
                 return scan_repo(target_repo)
@@ -146,6 +171,16 @@ class ToolContractsTest(unittest.TestCase):
                     "src/flash.c",
                     1,
                     1,
+                )
+            if contract_name == "impact_from_paths":
+                return impact_from_paths(target_repo, ["src/impact.c"], created["data"]["scan_id"])
+            if contract_name == "impact_from_anchor":
+                return impact_from_anchor(target_repo, "flash_init", created["data"]["scan_id"])
+            if contract_name == "summarize_impact":
+                impact_payload = impact_from_paths(target_repo, ["src/impact.c"], created["data"]["scan_id"])
+                return summarize_impact(
+                    target_repo,
+                    impact_payload["data"]["impact_id"],
                 )
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
@@ -316,6 +351,51 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(open_payload["data"]["line_end"], 1)
             self.assertEqual(open_payload["data"]["lines"], ["int flash_init(void) { return 0; }"])
             self.assertEqual(open_payload["recommended_next_tools"], ["read_evidence_pack"])
+
+    def test_impact_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_proven_call_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+
+            paths_payload = impact_from_paths(str(repo), ["src/impact.c"], created["data"]["scan_id"])
+            anchor_payload = impact_from_anchor(str(repo), "flash_init", created["data"]["scan_id"])
+            summary_payload = summarize_impact(
+                str(repo),
+                paths_payload["data"]["impact_id"],
+            )
+
+            self.assertEqual(paths_payload["status"], "ok")
+            self.assertRegex(paths_payload["data"]["impact_id"], r"^impact_[0-9a-f]{12}$")
+            self.assertEqual(paths_payload["data"]["changed_paths"], ["src/impact.c"])
+            self.assertIn(
+                "src/impact.c",
+                {item["path"] for item in paths_payload["data"]["likely_propagation"]},
+            )
+            self.assertIn(
+                "main",
+                {item["anchor_name"] for item in paths_payload["data"]["likely_propagation"]},
+            )
+            self.assertIn(
+                "demo_main",
+                {item["anchor_name"] for item in paths_payload["data"]["likely_propagation"]},
+            )
+            self.assertEqual(
+                paths_payload["recommended_next_tools"],
+                ["summarize_impact", "plan_slice"],
+            )
+
+            self.assertEqual(anchor_payload["status"], "ok")
+            self.assertEqual(anchor_payload["data"]["seed_kind"], "anchor")
+            self.assertEqual(anchor_payload["data"]["anchor_name"], "flash_init")
+
+            self.assertEqual(summary_payload["status"], "ok")
+            self.assertEqual(summary_payload["data"]["impact_id"], paths_payload["data"]["impact_id"])
+            self.assertTrue(summary_payload["data"]["risks"])
+            self.assertTrue(summary_payload["data"]["summary"])
+            self.assertEqual(
+                summary_payload["recommended_next_tools"],
+                ["plan_slice", "build_evidence_pack"],
+            )
 
     def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

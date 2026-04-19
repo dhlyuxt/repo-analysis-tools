@@ -1,6 +1,6 @@
 # MCP Tool Contracts
 
-This document records the M2 runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. It mirrors the real analysis-first mainline behavior rather than the old M1 stub baseline.
+This document records the M3 runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. It mirrors the real analysis-first mainline behavior rather than the old M1 stub baseline.
 
 ## Standard Response Envelope
 
@@ -21,6 +21,7 @@ The current contract set uses these stable ID families:
 - `scan`: emitted as `scan_<12-hex>`
 - `slice`: emitted as `slice_<12-hex>`
 - `evidence_pack`: emitted as `evidence_pack_<12-hex>`
+- `impact`: emitted as `impact_<12-hex>`
 - `report`: emitted as `report_<12-hex>`
 - `export`: emitted as `export_<12-hex>`
 
@@ -95,9 +96,9 @@ Contract consumers should treat `read_evidence_pack` as the handoff point from s
 
 | Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
 | --- | --- | --- | --- | --- | --- |
-| `impact_from_paths` | `target_repo`, `scan_id`, `paths` | `target_repo`, `runtime_root`, `scan_id`, `impact_summary` | `scan` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `build_evidence_pack` |
-| `impact_from_anchor` | `target_repo`, `scan_id`, `anchor_name` | `target_repo`, `runtime_root`, `scan_id`, `impact_summary` | `scan` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `build_evidence_pack` |
-| `summarize_impact` | `target_repo`, `scan_id`, `focus` | `target_repo`, `runtime_root`, `scan_id`, `risks` | `scan` | `invalid_input`, `not_found`, `internal` | `render_analysis_outline`, `render_focus_report` |
+| `impact_from_paths` | `target_repo`, `scan_id`, `paths` | `target_repo`, `runtime_root`, `scan_id`, `impact_id`, `seed_kind`, `changed_paths`, `direct_impacts`, `likely_propagation`, `uncertainty_notes`, `recommended_regression_focus`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `plan_slice` |
+| `impact_from_anchor` | `target_repo`, `scan_id`, `anchor_name` | `target_repo`, `runtime_root`, `scan_id`, `impact_id`, `seed_kind`, `anchor_name`, `direct_impacts`, `likely_propagation`, `uncertainty_notes`, `recommended_regression_focus`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `plan_slice` |
+| `summarize_impact` | `target_repo`, `impact_id` | `target_repo`, `runtime_root`, `impact_id`, `scan_id`, `confirmed_impact`, `likely_propagation`, `regression_focus`, `blind_spots`, `risks`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `plan_slice`, `build_evidence_pack` |
 
 ## `report`
 

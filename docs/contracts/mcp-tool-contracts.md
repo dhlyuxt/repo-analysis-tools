@@ -1,6 +1,6 @@
 # MCP Tool Contracts
 
-This document records the M3 runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. It mirrors the real analysis-first mainline behavior rather than the old M1 stub baseline.
+This document records the current runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. It mirrors the real analysis-first mainline behavior rather than the old M1 stub baseline.
 
 ## Standard Response Envelope
 
@@ -27,7 +27,7 @@ The current contract set uses these stable ID families:
 
 ## Standard Failure Modes
 
-Contract stubs currently reuse the shared MCP-facing error taxonomy:
+The contract surface currently reuses the shared MCP-facing error taxonomy:
 
 - `invalid_input`
 - `not_found`
@@ -112,6 +112,6 @@ Contract consumers should treat `read_evidence_pack` as the handoff point from s
 
 | Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
 | --- | --- | --- | --- | --- | --- |
-| `export_analysis_bundle` | `target_repo`, `report_id` | `target_repo`, `runtime_root`, `report_id`, `export_id` | `report`, `export` | `invalid_input`, `not_found`, `internal` | `export_scope_snapshot`, `export_evidence_bundle` |
-| `export_scope_snapshot` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `export_id` | `scan`, `export` | `invalid_input`, `not_found`, `internal` | `export_evidence_bundle` |
-| `export_evidence_bundle` | `target_repo`, `evidence_pack_id` | `target_repo`, `runtime_root`, `evidence_pack_id`, `export_id` | `evidence_pack`, `export` | `invalid_input`, `not_found`, `internal` | none |
+| `export_analysis_bundle` | `target_repo`, `report_id` | `target_repo`, `runtime_root`, `report_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `copied_markdown_path`, `freshness_state` | `report`, `export` | `invalid_input`, `not_found`, `internal` | `export_scope_snapshot`, `export_evidence_bundle` |
+| `export_scope_snapshot` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `freshness_state` | `scan`, `export` | `invalid_input`, `not_found`, `internal` | `export_evidence_bundle` |
+| `export_evidence_bundle` | `target_repo`, `evidence_pack_id` | `target_repo`, `runtime_root`, `evidence_pack_id`, `scan_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `freshness_state` | `evidence_pack`, `export` | `invalid_input`, `not_found`, `internal` | none |

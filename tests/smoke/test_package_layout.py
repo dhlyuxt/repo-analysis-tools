@@ -29,6 +29,9 @@ EXPECTED_DIRECTORIES = [
     ROOT / "tests" / "e2e",
     ROOT / "docs" / "contracts",
 ]
+EXPECTED_FILES = [
+    ROOT / ".agents" / "skills" / "analysis-maintenance" / "SKILL.md",
+]
 
 
 class PackageLayoutTest(unittest.TestCase):
@@ -38,3 +41,7 @@ class PackageLayoutTest(unittest.TestCase):
     def test_required_top_level_directories_exist(self) -> None:
         for path in EXPECTED_DIRECTORIES:
             self.assertTrue(path.is_dir(), str(path))
+
+    def test_required_top_level_files_exist(self) -> None:
+        for path in EXPECTED_FILES:
+            self.assertTrue(path.is_file(), str(path))

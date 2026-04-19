@@ -11,6 +11,7 @@ from repo_analysis_tools.storage.contracts import STORAGE_BOUNDARIES
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ARCHITECTURE_DOC = REPO_ROOT / "docs" / "architecture.md"
 CONTRACT_DOC = REPO_ROOT / "docs" / "contracts" / "mcp-tool-contracts.md"
+ANALYSIS_MAINTENANCE_SKILL = REPO_ROOT / ".agents" / "skills" / "analysis-maintenance" / "SKILL.md"
 
 EXPECTED_ARCHITECTURE_BOUNDARIES = {
     "core",
@@ -168,3 +169,29 @@ class ArchitectureDocsTest(unittest.TestCase):
             for stable_id in contract.stable_ids
         }:
             self.assertIn(f"`{id_kind.value}`", document, id_kind.value)
+
+    def test_architecture_doc_records_export_layout_and_maintenance_skill(self) -> None:
+        document = self.read_text(ARCHITECTURE_DOC)
+        skill = self.read_text(ANALYSIS_MAINTENANCE_SKILL)
+
+        export_section = self.section_text(document, "M5 Export Handoff")
+
+        self.assertIn(".codewiki/export/", export_section)
+        self.assertIn("results/export_<12-hex>.json", export_section)
+        self.assertIn("bundles/export_<12-hex>/manifest.json", export_section)
+        self.assertIn("bundles/export_<12-hex>/payload.json", export_section)
+        self.assertIn("bundles/export_<12-hex>/report.md", export_section)
+        self.assertIn("source_kind", export_section)
+        self.assertIn("source_id", export_section)
+        self.assertIn("owner_tool", export_section)
+        self.assertIn("freshness", export_section)
+        self.assertIn("copied_paths", export_section)
+        self.assertIn("analysis-maintenance", document)
+        self.assertIn("get_scan_status / refresh_scan", skill)
+        self.assertIn("export_scope_snapshot / export_evidence_bundle / export_analysis_bundle", skill)
+        self.assertIn("inspect manifest freshness", skill)
+        self.assertIn("freshness.state", skill)
+
+        self.assertIn("export_scope_snapshot", skill)
+        self.assertIn("export_evidence_bundle", skill)
+        self.assertIn("export_analysis_bundle", skill)

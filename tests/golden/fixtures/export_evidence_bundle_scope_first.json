@@ -1,0 +1,26 @@
+{
+  "data": {
+    "evidence_pack_id": "evidence_pack_000000000001",
+    "export_id": "export_000000000001",
+    "export_kind": "evidence-bundle",
+    "freshness_state": "fresh",
+    "manifest_path": "<repo>/.codewiki/export/bundles/export_000000000001/manifest.json",
+    "payload_path": "<repo>/.codewiki/export/bundles/export_000000000001/payload.json",
+    "runtime_root": "<repo>/.codewiki",
+    "scan_id": "scan_000000000001",
+    "target_repo": "<repo>"
+  },
+  "messages": [
+    {
+      "level": "info",
+      "text": "evidence bundle exported"
+    },
+    {
+      "level": "info",
+      "text": "Cited files still match scan scan_000000000001."
+    }
+  ],
+  "recommended_next_tools": [],
+  "schema_version": "1",
+  "status": "ok"
+}

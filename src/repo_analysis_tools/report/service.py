@@ -13,6 +13,7 @@ from repo_analysis_tools.doc_dsl.mermaid_validator import MermaidValidator
 from repo_analysis_tools.doc_dsl.models import Document, MermaidBlock
 from repo_analysis_tools.doc_dsl.validators import validate_document
 from repo_analysis_tools.doc_specs.base import build_document_spec_registry
+from repo_analysis_tools.evidence.models import EvidencePack
 from repo_analysis_tools.evidence.store import EvidenceStore
 from repo_analysis_tools.renderers.markdown import MarkdownRenderer
 from repo_analysis_tools.report.models import ReportArtifact
@@ -37,7 +38,7 @@ class ReportService:
         repo = Path(target_repo).expanduser().resolve()
         evidence_pack = EvidenceStore.for_repo(repo).load(evidence_pack_id)
         document = build_module_summary_document(evidence_pack, module_name)
-        return self._render_and_persist(repo, document)
+        return self._render_and_persist(repo, document, evidence_pack=evidence_pack)
 
     def render_focus_report(
         self,
@@ -53,14 +54,20 @@ class ReportService:
             document = build_review_report_document(evidence_pack, "Evidence-backed review")
         else:
             raise ValueError(f"unsupported document_type: {document_type}")
-        return self._render_and_persist(repo, document)
+        return self._render_and_persist(repo, document, evidence_pack=evidence_pack)
 
     def render_analysis_outline(self, target_repo: Path | str, focus: str) -> ReportArtifact:
         repo = Path(target_repo).expanduser().resolve()
         document = build_design_note_document(focus)
         return self._render_and_persist(repo, document)
 
-    def _render_and_persist(self, target_repo: Path, document: Document) -> ReportArtifact:
+    def _render_and_persist(
+        self,
+        target_repo: Path,
+        document: Document,
+        *,
+        evidence_pack: EvidencePack | None = None,
+    ) -> ReportArtifact:
         spec = build_document_spec_registry()[document.document_type]
         errors = validate_document(document, spec)
         if errors:
@@ -77,5 +84,7 @@ class ReportService:
             markdown=markdown,
             markdown_path="",
             section_titles=[section.title for section in document.sections],
+            evidence_pack_id=None if evidence_pack is None else evidence_pack.evidence_pack_id,
+            scan_id=None if evidence_pack is None else evidence_pack.scan_id,
         )
         return ReportStore.for_repo(target_repo).save(artifact)

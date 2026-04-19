@@ -87,6 +87,35 @@ The persisted report artifacts live under `<target_repo>/.codewiki/report/`:
 - `results/report_<12-hex>.json` stores report metadata.
 - `rendered/report_<12-hex>.md` stores the final Markdown output.
 
+## M5 Export Handoff
+
+M5 makes export reuse real for Codex sessions:
+
+```text
+get_scan_status / refresh_scan
+-> export_scope_snapshot / export_evidence_bundle / export_analysis_bundle
+-> inspect manifest freshness
+-> hand recovered IDs or bundle paths to follow-up workflows
+```
+
+The persisted export artifacts live under `<target_repo>/.codewiki/export/`:
+
+- `latest.json` stores the latest export pointer.
+- `results/export_<12-hex>.json` stores export metadata and freshness ownership fields.
+- `bundles/export_<12-hex>/manifest.json` stores the reusable export manifest.
+- `bundles/export_<12-hex>/payload.json` stores the copied structured payload.
+- `bundles/export_<12-hex>/report.md` stores the copied Markdown artifact for analysis bundles.
+
+Freshness ownership fields are recorded so later workflows can decide whether reuse is safe:
+
+- `source_kind` records whether the export came from `scope`, `evidence`, or `report`.
+- `source_id` records the stable ID of the exported source artifact.
+- `owner_tool` records which export tool created the bundle.
+- `freshness` records the freshness state, summary, and drifted paths.
+- `copied_paths` records the bundle-local files that were written for reuse.
+
+The `analysis-maintenance` skill captures this handoff for operators who need to inspect freshness before resuming later workflows.
+
 ## Runtime Root And Path Rules
 
 All runtime-owned artifacts live under `<target_repo>/.codewiki/`.

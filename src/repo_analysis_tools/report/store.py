@@ -36,7 +36,21 @@ class ReportStore:
             markdown=artifact.markdown,
             markdown_path=markdown_path.as_posix(),
             section_titles=list(artifact.section_titles),
+            evidence_pack_id=artifact.evidence_pack_id,
+            scan_id=artifact.scan_id,
         )
         self.assets.write_json(f"results/{report_id}.json", persisted.to_dict())
         self.assets.write_json("latest.json", {"report_id": report_id})
         return persisted
+
+    def load_latest(self) -> ReportArtifact:
+        return self.load()
+
+    def load(self, report_id: str | None = None) -> ReportArtifact:
+        if report_id is None:
+            resolved_report_id = _validated_report_id(str(self.assets.read_json("latest.json")["report_id"]))
+        else:
+            resolved_report_id = _validated_report_id(report_id)
+        payload = self.assets.read_json(f"results/{resolved_report_id}.json")
+        markdown_path = Path(str(payload["markdown_path"]))
+        return ReportArtifact.from_dict(payload, markdown=markdown_path.read_text(encoding="utf-8"))

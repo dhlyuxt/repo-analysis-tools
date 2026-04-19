@@ -21,6 +21,8 @@ class ReportServiceTest(unittest.TestCase):
 
             self.assertRegex(artifact.report_id, r"^report_[0-9a-f]{12}$")
             self.assertEqual(artifact.document_type, "module-summary")
+            self.assertEqual(artifact.evidence_pack_id, evidence_pack.evidence_pack_id)
+            self.assertEqual(artifact.scan_id, evidence_pack.scan_id)
             self.assertIn("```mermaid", artifact.markdown)
             self.assertTrue(Path(artifact.markdown_path).is_file())
 
@@ -38,6 +40,8 @@ class ReportServiceTest(unittest.TestCase):
             )
 
             self.assertEqual(artifact.document_type, "issue-analysis")
+            self.assertEqual(artifact.evidence_pack_id, evidence_pack.evidence_pack_id)
+            self.assertEqual(artifact.scan_id, evidence_pack.scan_id)
             self.assertIn("# ", artifact.markdown)
 
     def test_render_analysis_outline_persists_design_note(self) -> None:
@@ -48,4 +52,6 @@ class ReportServiceTest(unittest.TestCase):
             artifact = ReportService().render_analysis_outline(repo, "flash init flow")
 
             self.assertEqual(artifact.document_type, "design-note")
+            self.assertIsNone(artifact.evidence_pack_id)
+            self.assertIsNone(artifact.scan_id)
             self.assertTrue(Path(artifact.markdown_path).is_file())

@@ -127,6 +127,9 @@ class ToolContractsTest(unittest.TestCase):
             "render_focus_report",
             "render_module_summary",
             "render_analysis_outline",
+            "export_analysis_bundle",
+            "export_scope_snapshot",
+            "export_evidence_bundle",
         }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
@@ -203,6 +206,20 @@ class ToolContractsTest(unittest.TestCase):
                 )
             if contract_name == "render_analysis_outline":
                 return report_tools.render_analysis_outline(target_repo, "entrypoint")
+            if contract_name == "export_scope_snapshot":
+                return export_tools.export_scope_snapshot(target_repo, created["data"]["scan_id"])
+            if contract_name == "export_evidence_bundle":
+                return export_tools.export_evidence_bundle(
+                    target_repo,
+                    evidence_pack["data"]["evidence_pack_id"],
+                )
+            if contract_name == "export_analysis_bundle":
+                report_payload = report_tools.render_module_summary(
+                    target_repo,
+                    evidence_pack["data"]["evidence_pack_id"],
+                    "flash",
+                )
+                return export_tools.export_analysis_bundle(target_repo, report_payload["data"]["report_id"])
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -260,15 +277,18 @@ class ToolContractsTest(unittest.TestCase):
         self.assertEqual(payload["data"]["scan_id"], "scan_stub000001")
         self.assertEqual(payload["recommended_next_tools"], ["get_scan_status", "show_scope"])
 
-    def test_scan_backed_stubs_generate_declared_scan_id_when_omitted(self) -> None:
+    def test_export_scope_snapshot_uses_real_scan_id_when_omitted(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            scan_status_payload = get_scan_status(str(repo))
-            export_payload = export_scope_snapshot("/tmp/demo-repo")
+            created = scan_repo(str(repo))
+            export_payload = export_scope_snapshot(str(repo))
 
-        self.assertRegex(scan_status_payload["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
-        self.assertRegex(export_payload["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
+            self.assertEqual(export_payload["status"], "ok")
+            self.assertEqual(export_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertEqual(export_payload["data"]["export_kind"], "scope-snapshot")
+            self.assertTrue(Path(export_payload["data"]["manifest_path"]).is_file())
+            self.assertTrue(Path(export_payload["data"]["payload_path"]).is_file())
+            self.assertEqual(export_payload["data"]["freshness_state"], "fresh")
 
     def test_stub_outputs_do_not_include_undeclared_contract_version(self) -> None:
         payload = stub_payload("get_scan_status", target_repo="/tmp/demo-repo")
@@ -441,6 +461,53 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(module_payload["data"]["document_type"], "module-summary")
             self.assertIn("markdown_path", module_payload["data"])
             self.assertEqual(focus_payload["data"]["document_type"], "issue-analysis")
+
+    def test_export_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+            report_payload = report_tools.render_module_summary(
+                str(repo),
+                build_payload["data"]["evidence_pack_id"],
+                "flash",
+            )
+
+            scope_payload = export_tools.export_scope_snapshot(str(repo), created["data"]["scan_id"])
+            evidence_payload = export_tools.export_evidence_bundle(
+                str(repo),
+                build_payload["data"]["evidence_pack_id"],
+            )
+            analysis_payload = export_tools.export_analysis_bundle(
+                str(repo),
+                report_payload["data"]["report_id"],
+            )
+
+            self.assertEqual(scope_payload["status"], "ok")
+            self.assertEqual(scope_payload["data"]["export_kind"], "scope-snapshot")
+            self.assertEqual(scope_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertTrue(Path(scope_payload["data"]["manifest_path"]).is_file())
+            self.assertTrue(Path(scope_payload["data"]["payload_path"]).is_file())
+            self.assertEqual(scope_payload["data"]["freshness_state"], "fresh")
+
+            self.assertEqual(evidence_payload["status"], "ok")
+            self.assertEqual(evidence_payload["data"]["export_kind"], "evidence-bundle")
+            self.assertEqual(
+                evidence_payload["data"]["evidence_pack_id"],
+                build_payload["data"]["evidence_pack_id"],
+            )
+            self.assertEqual(evidence_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertTrue(Path(evidence_payload["data"]["manifest_path"]).is_file())
+            self.assertTrue(Path(evidence_payload["data"]["payload_path"]).is_file())
+
+            self.assertEqual(analysis_payload["status"], "ok")
+            self.assertEqual(analysis_payload["data"]["export_kind"], "analysis-bundle")
+            self.assertEqual(analysis_payload["data"]["report_id"], report_payload["data"]["report_id"])
+            self.assertTrue(Path(analysis_payload["data"]["manifest_path"]).is_file())
+            self.assertTrue(Path(analysis_payload["data"]["payload_path"]).is_file())
+            self.assertTrue(Path(analysis_payload["data"]["copied_markdown_path"]).is_file())
+            self.assertEqual(analysis_payload["data"]["freshness_state"], "fresh")
 
     def test_render_focus_report_returns_invalid_input_for_unsupported_document_type(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

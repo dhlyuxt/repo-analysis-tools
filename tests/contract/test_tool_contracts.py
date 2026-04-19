@@ -6,6 +6,7 @@ from pathlib import Path
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
 from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
+from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.mcp.tools.shared import stub_payload
 from tests.fixtures.scope_first_repo import build_scope_first_repo
@@ -46,7 +47,7 @@ TOOL_CALL_KWARGS = {
     "get_scan_status": {"target_repo": "/tmp/demo-repo"},
     "show_scope": {"target_repo": "/tmp/demo-repo"},
     "list_scope_nodes": {"target_repo": "/tmp/demo-repo"},
-    "explain_scope_node": {"target_repo": "/tmp/demo-repo", "node_id": "src"},
+    "explain_scope_node": {"target_repo": "/tmp/demo-repo", "node_id": "scope_src"},
     "list_anchors": {"target_repo": "/tmp/demo-repo"},
     "find_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
     "describe_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
@@ -80,7 +81,14 @@ TOOL_CALL_KWARGS = {
 
 class ToolContractsTest(unittest.TestCase):
     def _invoke_tool(self, contract_name: str) -> dict:
-        if contract_name not in {"scan_repo", "refresh_scan", "get_scan_status"}:
+        if contract_name not in {
+            "scan_repo",
+            "refresh_scan",
+            "get_scan_status",
+            "show_scope",
+            "list_scope_nodes",
+            "explain_scope_node",
+        }:
             return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
 
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -95,6 +103,12 @@ class ToolContractsTest(unittest.TestCase):
                     target_repo=target_repo,
                     scan_id=created["data"]["scan_id"],
                 )
+            if contract_name == "show_scope":
+                return show_scope(target_repo, created["data"]["scan_id"])
+            if contract_name == "list_scope_nodes":
+                return list_scope_nodes(target_repo, created["data"]["scan_id"])
+            if contract_name == "explain_scope_node":
+                return explain_scope_node(target_repo, "scope_src", created["data"]["scan_id"])
             return TOOL_BY_NAME[contract_name](target_repo=target_repo)
 
     def test_every_required_domain_group_exists(self) -> None:
@@ -175,6 +189,23 @@ class ToolContractsTest(unittest.TestCase):
                 status["data"]["latest_completed_at"],
                 created["data"]["latest_completed_at"],
             )
+
+    def test_scope_tools_use_real_services(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            created = scan_repo(str(repo))
+
+            scope_payload = show_scope(str(repo))
+            nodes_payload = list_scope_nodes(str(repo), created["data"]["scan_id"])
+            explain_payload = explain_scope_node(str(repo), "scope_src", created["data"]["scan_id"])
+
+            self.assertEqual(scope_payload["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertEqual(
+                scope_payload["data"]["role_counts"],
+                {"external": 1, "generated": 1, "primary": 3, "support": 1},
+            )
+            self.assertEqual(nodes_payload["data"]["nodes"][0]["node_id"], "scope_demo")
+            self.assertEqual(explain_payload["data"]["related_files"][0], "src/config.h")
 
     def test_refresh_scan_returns_error_for_unknown_scan_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

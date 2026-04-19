@@ -9,6 +9,7 @@ from repo_analysis_tools.core.ids import StableIdKind, make_stable_id
 from repo_analysis_tools.core.paths import normalize_repo_relative_path
 from repo_analysis_tools.scan.models import ScannedFile, ScanSnapshot
 from repo_analysis_tools.scan.store import ScanStore
+from repo_analysis_tools.scope.service import ScopeService
 
 
 class ScanService:
@@ -39,4 +40,5 @@ class ScanService:
             files=files,
         )
         ScanStore.for_repo(repo).save(snapshot)
+        ScopeService().build_snapshot(repo, snapshot.scan_id)
         return snapshot

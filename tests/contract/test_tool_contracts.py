@@ -442,6 +442,22 @@ class ToolContractsTest(unittest.TestCase):
             self.assertIn("markdown_path", module_payload["data"])
             self.assertEqual(focus_payload["data"]["document_type"], "issue-analysis")
 
+    def test_render_focus_report_returns_invalid_input_for_unsupported_document_type(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_repo(str(repo))
+            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
+            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
+
+            payload = report_tools.render_focus_report(
+                str(repo),
+                build_payload["data"]["evidence_pack_id"],
+                "unsupported",
+            )
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+
     def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))

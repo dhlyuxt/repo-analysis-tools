@@ -79,8 +79,8 @@ class AnchorServiceTest(unittest.TestCase):
             self.assertTrue(
                 {
                     ("defines", "EF_USING_ENV", "src/config.h", 1, "src/config.h"),
-                    ("direct_call", "main", "flash_init", 3, "src/main.c"),
-                    ("includes", "main", "config.h", 1, "config.h"),
+                    ("direct_call", "main", "flash_init", 3, "src/flash.c"),
+                    ("includes", "main", "config.h", 1, "src/config.h"),
                 }.issubset(
                     {
                         (
@@ -104,6 +104,34 @@ class AnchorServiceTest(unittest.TestCase):
 
             self.assertEqual(anchor_snapshot.scan_id, scan_snapshot.scan_id)
             self.assertIn("main", {anchor.name for anchor in anchor_snapshot.anchors})
+
+    def test_build_snapshot_relinks_cross_file_direct_calls_to_repo_wide_definition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = AnchorService().build_snapshot(repo, scan_snapshot.scan_id)
+            flash_definition = next(
+                anchor
+                for anchor in snapshot.anchors
+                if anchor.name == "flash_init" and anchor.kind == "function_definition"
+            )
+
+            self.assertEqual(
+                sorted(
+                    (
+                        relation.source_name,
+                        relation.target_anchor_id,
+                        relation.target_path,
+                    )
+                    for relation in snapshot.relations
+                    if relation.kind == "direct_call" and relation.target_name == "flash_init"
+                ),
+                [
+                    ("demo_main", flash_definition.anchor_id, "src/flash.c"),
+                    ("main", flash_definition.anchor_id, "src/flash.c"),
+                ],
+            )
 
     def test_describe_anchor_for_easyflash_includes_direct_call_relation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

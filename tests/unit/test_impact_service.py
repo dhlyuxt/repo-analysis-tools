@@ -5,6 +5,7 @@ from pathlib import Path
 from repo_analysis_tools.impact.service import ImpactService
 from repo_analysis_tools.impact.store import ImpactStore
 from repo_analysis_tools.scan.service import ScanService
+from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 def build_proven_call_repo(tmp_path: Path) -> Path:
@@ -136,3 +137,27 @@ class ImpactServiceTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "anchor_name must not be empty"):
                 ImpactService().from_anchor(repo, "   ", scan_snapshot.scan_id)
+
+    def test_from_paths_on_scope_first_restores_cross_file_reverse_callers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            result = ImpactService().from_paths(repo, ["src/flash.c"], scan_snapshot.scan_id)
+
+            self.assertEqual(
+                [(target.anchor_name, target.path) for target in result.likely_propagation],
+                [("demo_main", "demo/demo_main.c"), ("main", "src/main.c")],
+            )
+
+    def test_from_paths_on_scope_first_header_change_surfaces_include_dependents(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            result = ImpactService().from_paths(repo, ["src/config.h"], scan_snapshot.scan_id)
+
+            self.assertEqual(
+                [(target.anchor_name, target.path) for target in result.likely_propagation],
+                [("main", "src/main.c")],
+            )

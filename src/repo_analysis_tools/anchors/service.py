@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from repo_analysis_tools.anchors.models import AnchorDescription, AnchorRelation, AnchorSnapshot
 from repo_analysis_tools.anchors.parser import CAnchorParser
@@ -27,6 +27,7 @@ class AnchorService:
             extraction_backend = parsed.backend
             anchors.extend(parsed.anchors)
             relations.extend(parsed.relations)
+        relations = self._relinked_relations(anchors, relations)
         snapshot = AnchorSnapshot(
             scan_id=scan_snapshot.scan_id,
             repo_root=scan_snapshot.repo_root,
@@ -111,3 +112,100 @@ class AnchorService:
         if not normalized:
             raise ValueError("anchor_name must not be empty")
         return normalized
+
+    def _relinked_relations(
+        self,
+        anchors: list,
+        relations: list[AnchorRelation],
+    ) -> list[AnchorRelation]:
+        anchors_by_id = {anchor.anchor_id: anchor for anchor in anchors}
+        definition_anchors_by_name: dict[str, list] = {}
+        known_paths = {anchor.path for anchor in anchors}
+
+        for anchor in anchors:
+            if anchor.kind != "function_definition":
+                continue
+            definition_anchors_by_name.setdefault(anchor.name, []).append(anchor)
+
+        for candidates in definition_anchors_by_name.values():
+            candidates.sort(key=lambda item: (item.path, item.start_line, item.end_line))
+
+        relinked: list[AnchorRelation] = []
+        for relation in relations:
+            if relation.kind == "direct_call":
+                target_anchor = self._resolve_repo_wide_call_target(
+                    definition_anchors_by_name,
+                    relation.target_name,
+                )
+                if target_anchor is not None:
+                    relinked.append(
+                        AnchorRelation(
+                            kind=relation.kind,
+                            source_anchor_id=relation.source_anchor_id,
+                            source_name=relation.source_name,
+                            target_name=relation.target_name,
+                            target_anchor_id=target_anchor.anchor_id,
+                            target_path=target_anchor.path,
+                            line=relation.line,
+                        )
+                    )
+                    continue
+
+            if relation.kind == "includes":
+                resolved_target_path = self._resolve_include_target_path(
+                    anchors_by_id=anchors_by_id,
+                    known_paths=known_paths,
+                    relation=relation,
+                )
+                relinked.append(
+                    AnchorRelation(
+                        kind=relation.kind,
+                        source_anchor_id=relation.source_anchor_id,
+                        source_name=relation.source_name,
+                        target_name=relation.target_name,
+                        target_anchor_id=relation.target_anchor_id,
+                        target_path=resolved_target_path,
+                        line=relation.line,
+                    )
+                )
+                continue
+
+            relinked.append(relation)
+        return relinked
+
+    def _resolve_repo_wide_call_target(
+        self,
+        definition_anchors_by_name: dict[str, list],
+        target_name: str,
+    ):
+        candidates = definition_anchors_by_name.get(target_name, [])
+        if not candidates:
+            return None
+        return candidates[0]
+
+    def _resolve_include_target_path(
+        self,
+        *,
+        anchors_by_id: dict[str, object],
+        known_paths: set[str],
+        relation: AnchorRelation,
+    ) -> str | None:
+        raw_target = relation.target_path or relation.target_name
+        if raw_target is None:
+            return relation.target_path
+        if raw_target in known_paths:
+            return raw_target
+
+        source_anchor = anchors_by_id.get(relation.source_anchor_id)
+        if source_anchor is not None:
+            source_dir = PurePosixPath(source_anchor.path).parent
+            relative_candidate = (source_dir / raw_target).as_posix()
+            if relative_candidate in known_paths:
+                return relative_candidate
+
+        basename_matches = sorted(
+            path for path in known_paths if PurePosixPath(path).name == PurePosixPath(raw_target).name
+        )
+        if len(basename_matches) == 1:
+            return basename_matches[0]
+        return relation.target_path

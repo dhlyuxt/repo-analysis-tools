@@ -13,6 +13,26 @@ from tests.fixtures.easyflash_repo import materialize_easyflash_repo
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
+def build_ambiguous_call_target_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "ambiguous-call-target-repo"
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "demo").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "main.c").write_text(
+        "int flash_init(void);\n"
+        "int main(void) { return flash_init(); }\n",
+        encoding="utf-8",
+    )
+    (repo / "src" / "flash.c").write_text(
+        "int flash_init(void) { return 0; }\n",
+        encoding="utf-8",
+    )
+    (repo / "demo" / "flash.c").write_text(
+        "int flash_init(void) { return 1; }\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
 class AnchorServiceTest(unittest.TestCase):
     def test_parser_uses_tree_sitter_primary_path_when_runtime_is_compatible(self) -> None:
         parser = CAnchorParser()
@@ -132,6 +152,27 @@ class AnchorServiceTest(unittest.TestCase):
                     ("main", flash_definition.anchor_id, "src/flash.c"),
                 ],
             )
+
+    def test_build_snapshot_keeps_ambiguous_repo_wide_direct_call_targets_unresolved(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_ambiguous_call_target_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = AnchorService().build_snapshot(repo, scan_snapshot.scan_id)
+            ambiguous_definition_ids = {
+                anchor.anchor_id
+                for anchor in snapshot.anchors
+                if anchor.name == "flash_init" and anchor.kind == "function_definition"
+            }
+
+            matching_relations = [
+                relation
+                for relation in snapshot.relations
+                if relation.kind == "direct_call" and relation.source_name == "main"
+            ]
+
+            self.assertEqual(len(matching_relations), 1)
+            self.assertNotIn(matching_relations[0].target_anchor_id, ambiguous_definition_ids)
 
     def test_describe_anchor_for_easyflash_includes_direct_call_relation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

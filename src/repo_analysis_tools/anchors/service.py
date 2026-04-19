@@ -179,7 +179,7 @@ class AnchorService:
         target_name: str,
     ):
         candidates = definition_anchors_by_name.get(target_name, [])
-        if not candidates:
+        if len(candidates) != 1:
             return None
         return candidates[0]
 

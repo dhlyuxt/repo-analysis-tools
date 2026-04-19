@@ -143,6 +143,12 @@ class ToolContractsTest(unittest.TestCase):
             self.assertTrue(contract.output_schema, contract.name)
             self.assertTrue(contract.failure_modes, contract.name)
 
+    def test_plan_slice_contract_recommended_next_tools_match_runtime_behavior(self) -> None:
+        self.assertEqual(
+            CONTRACT_BY_NAME["plan_slice"].recommended_next_tools,
+            ("inspect_slice", "build_evidence_pack"),
+        )
+
     def test_contract_names_and_imported_tool_set_stay_aligned(self) -> None:
         self.assertEqual(set(TOOL_BY_NAME), set(CONTRACT_BY_NAME))
 
@@ -266,6 +272,10 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(plan_payload["data"]["selected_anchor_names"], ["flash_init"])
             self.assertEqual(plan_payload["data"]["notes"], ["Located definition candidates for flash_init."])
             self.assertNotIn("M1", plan_payload["messages"][0]["text"])
+            self.assertEqual(
+                plan_payload["recommended_next_tools"],
+                ["inspect_slice", "build_evidence_pack"],
+            )
             self.assertEqual(inspect_payload["data"]["members"], ["src/flash.c"])
             self.assertEqual(expand_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
             self.assertFalse(expand_payload["data"]["expanded"])

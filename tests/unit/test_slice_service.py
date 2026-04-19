@@ -3,12 +3,32 @@ import unittest
 from pathlib import Path
 
 from repo_analysis_tools.scan.service import ScanService
+from repo_analysis_tools.slice.query_classifier import QueryClassifier
 from repo_analysis_tools.slice.service import SliceService
 from repo_analysis_tools.slice.store import SliceStore
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 class SliceServiceTest(unittest.TestCase):
+    def test_classifier_accepts_common_quoted_symbol_forms(self) -> None:
+        classifier = QueryClassifier()
+
+        for question in (
+            "Where is 'flash_init' defined?",
+            'Where is "flash_init" defined?',
+            "Where is `flash_init` defined?",
+        ):
+            with self.subTest(question=question):
+                classification = classifier.classify(question)
+                self.assertEqual(classification.query_kind, "locate_symbol")
+                self.assertEqual(classification.symbol_name, "flash_init")
+
+    def test_classifier_prioritizes_file_role_over_startup_substrings(self) -> None:
+        classification = QueryClassifier().classify("What is the role of startup.c?")
+
+        self.assertEqual(classification.query_kind, "file_role")
+        self.assertEqual(classification.subject, "startup.c")
+
     def test_plan_locate_symbol_selects_definition_and_persists_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
@@ -70,3 +90,13 @@ class SliceServiceTest(unittest.TestCase):
             self.assertEqual(inspected.members, ["src/flash.c"])
             self.assertEqual(expanded.slice_id, manifest.slice_id)
             self.assertFalse(expanded.expanded)
+
+    def test_plan_locate_symbol_supports_quoted_symbol_questions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            manifest = SliceService().plan(repo, "Where is `flash_init` defined?", scan_snapshot.scan_id)
+
+            self.assertEqual(manifest.query_kind, "locate_symbol")
+            self.assertEqual(manifest.selected_files, ["src/flash.c"])

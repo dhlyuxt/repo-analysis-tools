@@ -21,7 +21,7 @@ SLICE_CONTRACTS = (
         },
         stable_ids=(StableIdKind.SLICE,),
         failure_modes=(ErrorCode.INVALID_INPUT, ErrorCode.NOT_FOUND, ErrorCode.INTERNAL),
-        recommended_next_tools=("expand_slice", "build_evidence_pack"),
+        recommended_next_tools=("inspect_slice", "build_evidence_pack"),
     ),
     ToolContract(
         name="expand_slice",

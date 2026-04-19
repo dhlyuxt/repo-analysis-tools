@@ -70,6 +70,23 @@ The persisted impact artifacts live under `<target_repo>/.codewiki/impact/`:
 
 This handoff is intentionally conservative. Clients must distinguish confirmed impact, likely propagation, and blind spots instead of collapsing them into one certainty bucket.
 
+## M4 Document Handoff
+
+M4 makes the analysis-writing path real for Codex sessions:
+
+```text
+plan_slice / summarize_impact
+-> build_evidence_pack
+-> render_focus_report / render_module_summary / render_analysis_outline
+-> persisted report artifact
+```
+
+The persisted report artifacts live under `<target_repo>/.codewiki/report/`:
+
+- `latest.json` stores the latest report pointer.
+- `results/report_<12-hex>.json` stores report metadata.
+- `rendered/report_<12-hex>.md` stores the final Markdown output.
+
 ## Runtime Root And Path Rules
 
 All runtime-owned artifacts live under `<target_repo>/.codewiki/`.

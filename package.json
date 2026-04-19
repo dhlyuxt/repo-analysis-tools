@@ -1,0 +1,8 @@
+{
+  "name": "repo-analysis-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "mermaid": "11.14.0"
+  }
+}

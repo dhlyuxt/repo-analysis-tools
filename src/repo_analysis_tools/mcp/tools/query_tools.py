@@ -14,6 +14,16 @@ def _symbol_rows(rows) -> list[dict[str, object]]:
     return [dict(row.__dict__) for row in rows]
 
 
+def _call_relation_rows(rows) -> list[dict[str, object]]:
+    return [
+        {
+            **dict(row.__dict__),
+            "call_lines": list(row.call_lines),
+        }
+        for row in rows
+    ]
+
+
 @mcp.tool()
 def list_priority_files(scan_id: str) -> dict[str, object]:
     try:
@@ -119,9 +129,9 @@ def query_call_relations(scan_id: str, function_id: str) -> dict[str, object]:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
     return ok_response(
         data={
-            "callers": _symbol_rows(result.callers),
-            "callees": _symbol_rows(result.callees),
-            "non_resolved_callees": _symbol_rows(result.non_resolved_callees),
+            "callers": _call_relation_rows(result.callers),
+            "callees": _call_relation_rows(result.callees),
+            "non_resolved_callees": _call_relation_rows(result.non_resolved_callees),
         },
         messages=[],
         recommended_next_tools=["find_call_paths", "find_root_functions"],

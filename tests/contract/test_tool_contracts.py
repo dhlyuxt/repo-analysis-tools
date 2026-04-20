@@ -16,6 +16,7 @@ from repo_analysis_tools.mcp.tools.query_tools import (
     resolve_symbols,
 )
 from repo_analysis_tools.mcp.tools.scan_tools import rebuild_repo_snapshot
+from tests.fixtures.query_path_repo import build_query_path_repo
 from tests.fixtures.query_repo import build_query_repo
 
 
@@ -157,7 +158,43 @@ class ToolContractsTest(unittest.TestCase):
             self.assertEqual(context_payload["data"]["path"], "src/flash.c")
             self.assertEqual(relations_payload["messages"], [])
             self.assertEqual(relations_payload["data"]["callers"][0]["name"], "main")
+            self.assertIsInstance(relations_payload["data"]["callers"][0]["call_lines"], list)
+            self.assertIsInstance(relations_payload["data"]["callees"][0]["call_lines"], list)
             self.assertEqual(roots_payload["messages"], [])
             self.assertEqual(roots_payload["data"]["roots"][0]["name"], "main")
             self.assertEqual(paths_payload["messages"], [])
             self.assertEqual(paths_payload["data"]["status"], "found")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_path_repo(Path(tmpdir), branch_count=2)
+            rebuild_payload = rebuild_repo_snapshot(str(repo))
+            scan_id = rebuild_payload["data"]["scan_id"]
+            dst_id = resolve_symbols(scan_id, "dst")["data"]["matches"][0]["symbol_id"]
+
+            relations_payload = query_call_relations(scan_id, dst_id)
+
+            self.assertEqual(relations_payload["messages"], [])
+            self.assertIsInstance(relations_payload["data"]["callers"][0]["call_lines"], list)
+            self.assertIsInstance(relations_payload["data"]["callees"][0]["call_lines"], list)
+            self.assertIsInstance(
+                relations_payload["data"]["non_resolved_callees"][0]["call_lines"],
+                list,
+            )
+
+    def test_rebuild_repo_snapshot_rejects_missing_repo_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            missing_repo = Path(tmpdir) / "missing-repo"
+            payload = rebuild_repo_snapshot(str(missing_repo))
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+
+    def test_rebuild_repo_snapshot_rejects_non_directory_repo_path(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_file = Path(tmpdir) / "repo.txt"
+            repo_file.write_text("not a directory", encoding="utf-8")
+
+            payload = rebuild_repo_snapshot(str(repo_file))
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")

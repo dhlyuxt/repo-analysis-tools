@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from repo_analysis_tools.anchors.store import AnchorStore
 from repo_analysis_tools.core.errors import ErrorCode, error_response, ok_response
 from repo_analysis_tools.mcp.app import mcp
@@ -7,6 +9,11 @@ from repo_analysis_tools.scan.service import ScanService
 
 @mcp.tool()
 def rebuild_repo_snapshot(target_repo: str) -> dict[str, object]:
+    repo_path = Path(target_repo).expanduser().resolve()
+    if not repo_path.exists():
+        return error_response(ErrorCode.INVALID_INPUT, f"repository path does not exist: {target_repo}")
+    if not repo_path.is_dir():
+        return error_response(ErrorCode.INVALID_INPUT, f"repository path is not a directory: {target_repo}")
     try:
         snapshot = ScanService().scan(target_repo)
         anchor_snapshot = AnchorStore.for_repo(target_repo).load(scan_id=snapshot.scan_id)

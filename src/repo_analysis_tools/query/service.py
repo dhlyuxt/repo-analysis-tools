@@ -197,8 +197,60 @@ class QueryService:
 
         brace_depth = 0
         saw_open_brace = False
+        state = "normal"
+        escape = False
         for line_index in range(anchor.start_line - 1, len(source_lines)):
-            for character in source_lines[line_index]:
+            line = source_lines[line_index]
+            column = 0
+            while column < len(line):
+                character = line[column]
+                next_character = line[column + 1] if column + 1 < len(line) else ""
+
+                if state == "line_comment":
+                    break
+                if state == "block_comment":
+                    if character == "*" and next_character == "/":
+                        state = "normal"
+                        column += 2
+                        continue
+                    column += 1
+                    continue
+                if state == "string":
+                    if escape:
+                        escape = False
+                    elif character == "\\":
+                        escape = True
+                    elif character == '"':
+                        state = "normal"
+                    column += 1
+                    continue
+                if state == "char":
+                    if escape:
+                        escape = False
+                    elif character == "\\":
+                        escape = True
+                    elif character == "'":
+                        state = "normal"
+                    column += 1
+                    continue
+
+                if character == "/" and next_character == "/":
+                    state = "line_comment"
+                    break
+                if character == "/" and next_character == "*":
+                    state = "block_comment"
+                    column += 2
+                    continue
+                if character == '"':
+                    state = "string"
+                    escape = False
+                    column += 1
+                    continue
+                if character == "'":
+                    state = "char"
+                    escape = False
+                    column += 1
+                    continue
                 if character == "{":
                     brace_depth += 1
                     saw_open_brace = True
@@ -206,6 +258,9 @@ class QueryService:
                     brace_depth -= 1
                     if brace_depth == 0:
                         return line_index + 1
+                column += 1
+            if state == "line_comment":
+                state = "normal"
         return anchor.end_line
 
     def _normalized_symbol_kind(self, anchor: AnchorRecord) -> str:

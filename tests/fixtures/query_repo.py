@@ -21,6 +21,14 @@ def build_query_repo(tmp_path: Path) -> Path:
         "static int helper(void) { return 1; }\n",
         encoding="utf-8",
     )
+    (repo / "src" / "weird.c").write_text(
+        "int weird(void) {\n"
+        '    const char *s = "}";\n'
+        "    /* brace in comment { } */\n"
+        "    return 0;\n"
+        "}\n",
+        encoding="utf-8",
+    )
     (repo / "include" / "types.h").write_text(
         "typedef struct flash_cfg {\n"
         "    int enabled;\n"

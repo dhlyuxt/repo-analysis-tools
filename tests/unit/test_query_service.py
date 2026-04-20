@@ -72,3 +72,18 @@ class QueryServiceTest(unittest.TestCase):
 
             self.assertEqual(symbol_matches.match_count, 0)
             self.assertEqual(symbol_matches.matches, ())
+
+    def test_open_symbol_context_ignores_braces_inside_strings_and_comments(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            weird_symbol = service.resolve_symbols(repo, scan_snapshot.scan_id, "weird").matches[0]
+            symbol_context = service.open_symbol_context(repo, scan_snapshot.scan_id, weird_symbol.symbol_id, 0)
+
+            self.assertEqual(symbol_context.path, "src/weird.c")
+            self.assertEqual(symbol_context.definition_line_start, 1)
+            self.assertEqual(symbol_context.definition_line_end, 5)
+            self.assertEqual(symbol_context.lines[-1], "}")
+            self.assertIn('const char *s = "}";', symbol_context.lines[1])

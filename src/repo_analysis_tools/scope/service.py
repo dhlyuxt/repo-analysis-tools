@@ -29,7 +29,7 @@ class ScopeService:
         scan_snapshot = ScanStore.for_repo(repo).load(scan_id=scan_id)
         anchor_snapshot = AnchorStore.for_repo(repo).load(scan_id=scan_snapshot.scan_id)
         config = self.config_loader.load(str(repo))
-        scoped_files = self._classify_files(repo, scan_snapshot.files, anchor_snapshot, config)
+        scoped_files = self._classify_files(scan_snapshot.files, anchor_snapshot, config)
         nodes = self._build_nodes(scoped_files)
         snapshot = ScopeSnapshot(
             scan_id=scan_snapshot.scan_id,
@@ -54,7 +54,6 @@ class ScopeService:
 
     def _classify_files(
         self,
-        repo: Path,
         scanned_files: list[ScannedFile],
         anchor_snapshot: AnchorSnapshot,
         config: ScopeConfig,
@@ -108,7 +107,7 @@ class ScopeService:
             type_count = sum(1 for anchor in anchors if anchor.kind == "type_definition")
             macro_count = sum(1 for anchor in anchors if anchor.kind == "macro_definition")
             symbol_count = len(anchors)
-            line_count = self._line_count(repo / scanned_file.path)
+            line_count = scanned_file.line_count
             incoming_call_count = incoming_call_counts_by_path.get(scanned_file.path, 0)
             outgoing_call_count = outgoing_call_counts_by_path.get(scanned_file.path, 0)
             root_function_count = root_function_counts_by_path.get(scanned_file.path, 0)
@@ -220,9 +219,3 @@ class ScopeService:
         else:
             role_text = ", ".join(roles[:-1]) + f", and {roles[-1]}"
         return f"{len(nodes)} scope nodes cover {len(scoped_files)} files across {role_text} roles."
-
-    def _line_count(self, file_path: Path) -> int:
-        try:
-            return len(file_path.read_text(encoding="utf-8", errors="ignore").splitlines())
-        except FileNotFoundError:
-            return 0

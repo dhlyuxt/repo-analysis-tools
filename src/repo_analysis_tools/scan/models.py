@@ -9,12 +9,14 @@ class ScannedFile:
     path: str
     content_sha256: str
     size_bytes: int
+    line_count: int
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "path": self.path,
             "content_sha256": self.content_sha256,
             "size_bytes": self.size_bytes,
+            "line_count": self.line_count,
         }
 
     @classmethod
@@ -23,6 +25,7 @@ class ScannedFile:
             path=str(payload["path"]),
             content_sha256=str(payload["content_sha256"]),
             size_bytes=int(payload["size_bytes"]),
+            line_count=int(payload["line_count"]),
         )
 
 

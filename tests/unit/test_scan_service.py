@@ -7,6 +7,7 @@ from repo_analysis_tools.core.errors import ErrorCode
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.scan.service import ScanService
 from repo_analysis_tools.scan.store import ScanStore
+from repo_analysis_tools.scope.store import ScopeStore
 from tests.fixtures.git_helpers import init_git_fixture
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 

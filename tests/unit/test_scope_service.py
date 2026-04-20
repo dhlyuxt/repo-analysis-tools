@@ -37,7 +37,9 @@ class ScopeServiceTest(unittest.TestCase):
             scan_snapshot = ScanService().scan(repo)
 
             snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+            stored = ScopeStore.for_repo(repo).load(scan_snapshot.scan_id)
             by_path = {scoped_file.path: scoped_file for scoped_file in snapshot.files}
+            stored_by_path = {scoped_file.path: scoped_file for scoped_file in stored.files}
 
             self.assertEqual(by_path["src/main.c"].role, "primary")
             self.assertTrue(by_path["src/main.c"].has_main_definition)
@@ -56,6 +58,19 @@ class ScopeServiceTest(unittest.TestCase):
             self.assertEqual(by_path["src/flash.c"].incoming_call_count, 2)
             self.assertEqual(by_path["src/flash.c"].root_function_count, 0)
             self.assertEqual(by_path["src/config.h"].macro_count, 1)
+
+            self.assertEqual(stored_by_path["src/main.c"].line_count, 3)
+            self.assertTrue(stored_by_path["src/main.c"].has_main_definition)
+            self.assertEqual(stored_by_path["src/main.c"].symbol_count, 2)
+            self.assertEqual(stored_by_path["src/main.c"].function_count, 2)
+            self.assertEqual(stored_by_path["src/main.c"].incoming_call_count, 0)
+            self.assertEqual(stored_by_path["src/main.c"].outgoing_call_count, 1)
+            self.assertEqual(stored_by_path["src/main.c"].root_function_count, 1)
+            self.assertEqual(stored_by_path["src/main.c"].priority_score, 110)
+            self.assertEqual(stored_by_path["src/flash.c"].priority_score, 44)
+            self.assertEqual(stored_by_path["src/flash.c"].incoming_call_count, 2)
+            self.assertEqual(stored_by_path["src/flash.c"].root_function_count, 0)
+            self.assertEqual(stored_by_path["src/config.h"].macro_count, 1)
 
     def test_build_snapshot_classifies_expected_roles_and_persists_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

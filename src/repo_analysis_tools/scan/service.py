@@ -28,6 +28,9 @@ class ScanService:
                     path=relative_path,
                     content_sha256=hashlib.sha256(candidate.read_bytes()).hexdigest(),
                     size_bytes=candidate.stat().st_size,
+                    line_count=len(
+                        candidate.read_text(encoding="utf-8", errors="ignore").splitlines()
+                    ),
                 )
             )
         git_head, workspace_dirty = detect_git_provenance(repo)

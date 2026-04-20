@@ -24,6 +24,6 @@ def rebuild_repo_snapshot(target_repo: str) -> dict[str, object]:
     }
     return ok_response(
         data=data,
-        messages=["repo snapshot rebuilt"],
+        messages=[],
         recommended_next_tools=["list_priority_files", "get_file_info"],
     )

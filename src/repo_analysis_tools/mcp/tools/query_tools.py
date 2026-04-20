@@ -25,7 +25,7 @@ def list_priority_files(scan_id: str) -> dict[str, object]:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
     return ok_response(
         data={"files": [{"path": row.path, "priority_score": row.priority_score} for row in rows]},
-        messages=["priority files loaded"],
+        messages=[],
         recommended_next_tools=["get_file_info", "list_file_symbols"],
     )
 
@@ -41,7 +41,7 @@ def get_file_info(scan_id: str, path: str) -> dict[str, object]:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
     return ok_response(
         data=dict(row.__dict__),
-        messages=["file info loaded"],
+        messages=[],
         recommended_next_tools=["list_file_symbols", "find_root_functions"],
     )
 
@@ -65,7 +65,7 @@ def list_file_symbols(scan_id: str, paths: list[str]) -> dict[str, object]:
                 for row in rows
             ]
         },
-        messages=["file symbols loaded"],
+        messages=[],
         recommended_next_tools=["open_symbol_context", "resolve_symbols"],
     )
 
@@ -84,7 +84,7 @@ def resolve_symbols(scan_id: str, symbol_name: str) -> dict[str, object]:
             "match_count": result.match_count,
             "matches": _symbol_rows(result.matches),
         },
-        messages=["symbols resolved"],
+        messages=[],
         recommended_next_tools=["open_symbol_context", "query_call_relations"],
     )
 
@@ -103,7 +103,7 @@ def open_symbol_context(scan_id: str, symbol_id: str, context_lines: int) -> dic
             **dict(row.__dict__),
             "lines": list(row.lines),
         },
-        messages=["symbol context loaded"],
+        messages=[],
         recommended_next_tools=["query_call_relations", "find_call_paths"],
     )
 
@@ -123,7 +123,7 @@ def query_call_relations(scan_id: str, function_id: str) -> dict[str, object]:
             "callees": _symbol_rows(result.callees),
             "non_resolved_callees": _symbol_rows(result.non_resolved_callees),
         },
-        messages=["call relations loaded"],
+        messages=[],
         recommended_next_tools=["find_call_paths", "find_root_functions"],
     )
 
@@ -139,7 +139,7 @@ def find_root_functions(scan_id: str, paths: list[str]) -> dict[str, object]:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
     return ok_response(
         data={"roots": _symbol_rows(rows)},
-        messages=["root functions loaded"],
+        messages=[],
         recommended_next_tools=["find_call_paths", "open_symbol_context"],
     )
 
@@ -167,6 +167,6 @@ def find_call_paths(scan_id: str, from_function_id: str, to_function_id: str) ->
                 for path in result.paths
             ],
         },
-        messages=["call paths loaded"],
+        messages=[],
         recommended_next_tools=["open_symbol_context", "query_call_relations"],
     )

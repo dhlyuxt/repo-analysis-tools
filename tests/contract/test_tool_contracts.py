@@ -125,6 +125,7 @@ class ToolContractsTest(unittest.TestCase):
             scan_id = rebuild_payload["data"]["scan_id"]
 
             self.assertEqual(set(rebuild_payload["data"]), set(CONTRACT_BY_NAME["rebuild_repo_snapshot"].output_schema))
+            self.assertEqual(rebuild_payload["messages"], [])
             self.assertEqual(rebuild_payload["data"]["file_count"], 5)
             self.assertGreater(rebuild_payload["data"]["symbol_count"], 0)
             self.assertGreater(rebuild_payload["data"]["function_count"], 0)
@@ -140,15 +141,23 @@ class ToolContractsTest(unittest.TestCase):
             paths_payload = find_call_paths(scan_id, roots_payload["data"]["roots"][0]["symbol_id"], symbol_id)
 
             self.assertEqual(priority_payload["status"], "ok")
+            self.assertEqual(priority_payload["messages"], [])
             self.assertEqual(priority_payload["data"]["files"][0]["path"], "src/main.c")
+            self.assertEqual(file_info_payload["messages"], [])
             self.assertEqual(file_info_payload["data"]["path"], "src/main.c")
             self.assertTrue(file_info_payload["data"]["has_main_definition"])
+            self.assertEqual(file_symbols_payload["messages"], [])
             self.assertEqual(
                 {row["path"] for row in file_symbols_payload["data"]["files"]},
                 {"src/flash.c", "src/main.c"},
             )
+            self.assertEqual(symbol_payload["messages"], [])
             self.assertEqual(symbol_payload["data"]["match_count"], 2)
+            self.assertEqual(context_payload["messages"], [])
             self.assertEqual(context_payload["data"]["path"], "src/flash.c")
+            self.assertEqual(relations_payload["messages"], [])
             self.assertEqual(relations_payload["data"]["callers"][0]["name"], "main")
+            self.assertEqual(roots_payload["messages"], [])
             self.assertEqual(roots_payload["data"]["roots"][0]["name"], "main")
+            self.assertEqual(paths_payload["messages"], [])
             self.assertEqual(paths_payload["data"]["status"], "found")

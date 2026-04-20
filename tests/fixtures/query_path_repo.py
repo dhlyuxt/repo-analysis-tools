@@ -5,6 +5,7 @@ def build_query_path_repo(
     tmp_path: Path,
     branch_count: int = 2,
     include_dead_end: bool = False,
+    branch_names: list[str] | None = None,
 ) -> Path:
     repo = tmp_path / "query-path-repo"
     (repo / "src").mkdir(parents=True, exist_ok=True)
@@ -14,8 +15,9 @@ def build_query_path_repo(
         "",
         "int dst(void) { return helper() + external_api(); }",
     ]
-    for index in range(branch_count):
-        lines.append(f"int mid_{index}(void) {{ return dst(); }}")
+    branch_labels = branch_names if branch_names is not None else [f"mid_{index}" for index in range(branch_count)]
+    for branch_name in branch_labels:
+        lines.append(f"int {branch_name}(void) {{ return dst(); }}")
     if include_dead_end:
         lines.append("int dead_end(void) { return helper(); }")
 
@@ -23,7 +25,7 @@ def build_query_path_repo(
     if branch_count == 0 and not include_dead_end:
         lines.append("    return 0;")
     else:
-        fanout_terms = [f"mid_{index}()" for index in range(branch_count)]
+        fanout_terms = [f"{branch_name}()" for branch_name in branch_labels]
         if include_dead_end:
             fanout_terms.append("dead_end()")
         lines.append(f"    return {fanout_terms[0]}")

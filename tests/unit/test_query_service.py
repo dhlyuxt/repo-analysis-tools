@@ -128,6 +128,39 @@ class QueryServiceTest(unittest.TestCase):
             self.assertFalse(paths.truncated)
             self.assertEqual(paths.returned_path_count, 8)
 
+    def test_find_call_paths_returns_final_sort_prefix_before_truncating(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_path_repo(
+                Path(tmpdir),
+                branch_names=[
+                    "z0",
+                    "z1",
+                    "z2",
+                    "z3",
+                    "z4",
+                    "z5",
+                    "z6",
+                    "z7",
+                    "a0",
+                    "a1",
+                ],
+            )
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            src_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "src").matches[0].symbol_id
+            dst_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "dst").matches[0].symbol_id
+
+            paths = service.find_call_paths(repo, scan_snapshot.scan_id, src_id, dst_id)
+
+            self.assertEqual(paths.status, "truncated")
+            self.assertTrue(paths.truncated)
+            self.assertEqual(paths.returned_path_count, 8)
+            self.assertEqual(
+                [row.nodes[1].name for row in paths.paths],
+                ["a0", "a1", "z0", "z1", "z2", "z3", "z4", "z5"],
+            )
+
     def test_query_call_relations_rejects_non_function_symbol_id(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_query_repo(Path(tmpdir))

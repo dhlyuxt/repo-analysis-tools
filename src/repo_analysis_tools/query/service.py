@@ -148,12 +148,14 @@ class QueryService:
         from_anchor = self._function_anchor_for_id(anchor_snapshot.anchors, from_function_id)
         to_anchor = self._function_anchor_for_id(anchor_snapshot.anchors, to_function_id)
         anchor_by_id = {anchor.anchor_id: anchor for anchor in anchor_snapshot.anchors}
+        node_sort_keys = {anchor.anchor_id: (anchor.name, anchor.anchor_id) for anchor in anchor_snapshot.anchors}
         adjacency = self._call_adjacency(anchor_snapshot.relations)
         raw_paths, truncated = enumerate_simple_paths(
             adjacency,
             from_anchor.anchor_id,
             to_anchor.anchor_id,
             limit=self._PATH_SEARCH_LIMIT,
+            node_sort_keys=node_sort_keys,
         )
 
         path_rows = []

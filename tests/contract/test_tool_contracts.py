@@ -4,40 +4,61 @@ import unittest
 from pathlib import Path
 
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
-from repo_analysis_tools.mcp.tools import anchors_tools, evidence_tools, export_tools, impact_tools, report_tools, scan_tools, scope_tools, slice_tools
-from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor, list_anchors
-from repo_analysis_tools.mcp.tools.evidence_tools import build_evidence_pack, open_span, read_evidence_pack
-from repo_analysis_tools.mcp.tools.export_tools import export_scope_snapshot
-from repo_analysis_tools.mcp.tools.impact_tools import impact_from_anchor, impact_from_paths, summarize_impact
-from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
-from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
-from repo_analysis_tools.mcp.tools.shared import stub_payload
-from tests.fixtures.easyflash_repo import materialize_easyflash_repo
-from tests.fixtures.scope_first_repo import build_scope_first_repo
+from repo_analysis_tools.mcp.tools import query_tools, scan_tools
+from repo_analysis_tools.mcp.tools.query_tools import (
+    find_call_paths,
+    find_root_functions,
+    get_file_info,
+    list_file_symbols,
+    list_priority_files,
+    open_symbol_context,
+    query_call_relations,
+    resolve_symbols,
+)
+from repo_analysis_tools.mcp.tools.scan_tools import rebuild_repo_snapshot
+from tests.fixtures.query_repo import build_query_repo
 
 
-EXPECTED_DOMAINS = {
-    "scan",
-    "scope",
-    "anchors",
-    "slice",
-    "evidence",
-    "impact",
-    "report",
-    "export",
+EXPECTED_TOOL_NAMES = {
+    "rebuild_repo_snapshot",
+    "list_priority_files",
+    "get_file_info",
+    "list_file_symbols",
+    "resolve_symbols",
+    "open_symbol_context",
+    "query_call_relations",
+    "find_root_functions",
+    "find_call_paths",
 }
 
-TOOL_MODULES = (
-    scan_tools,
-    scope_tools,
-    anchors_tools,
-    slice_tools,
-    evidence_tools,
-    impact_tools,
-    report_tools,
-    export_tools,
-)
+LEGACY_TOOL_NAMES = {
+    "scan_repo",
+    "refresh_scan",
+    "get_scan_status",
+    "show_scope",
+    "list_scope_nodes",
+    "explain_scope_node",
+    "list_anchors",
+    "find_anchor",
+    "describe_anchor",
+    "plan_slice",
+    "expand_slice",
+    "inspect_slice",
+    "build_evidence_pack",
+    "read_evidence_pack",
+    "open_span",
+    "impact_from_paths",
+    "impact_from_anchor",
+    "summarize_impact",
+    "render_focus_report",
+    "render_module_summary",
+    "render_analysis_outline",
+    "export_analysis_bundle",
+    "export_scope_snapshot",
+    "export_evidence_bundle",
+}
 
+TOOL_MODULES = (scan_tools, query_tools)
 TOOL_BY_NAME = {
     name: tool
     for module in TOOL_MODULES
@@ -45,562 +66,89 @@ TOOL_BY_NAME = {
     if tool.__module__ == module.__name__ and not name.startswith("_")
 }
 
-TOOL_CALL_KWARGS = {
-    "scan_repo": {"target_repo": "/tmp/demo-repo"},
-    "refresh_scan": {"target_repo": "/tmp/demo-repo", "scan_id": "scan_000000000001"},
-    "get_scan_status": {"target_repo": "/tmp/demo-repo"},
-    "show_scope": {"target_repo": "/tmp/demo-repo"},
-    "list_scope_nodes": {"target_repo": "/tmp/demo-repo"},
-    "explain_scope_node": {"target_repo": "/tmp/demo-repo", "node_id": "scope_src"},
-    "list_anchors": {"target_repo": "/tmp/demo-repo"},
-    "find_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
-    "describe_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
-    "plan_slice": {"target_repo": "/tmp/demo-repo", "question": "Where does the entrypoint flow go?"},
-    "expand_slice": {"target_repo": "/tmp/demo-repo", "slice_id": "slice_000000000001"},
-    "inspect_slice": {"target_repo": "/tmp/demo-repo", "slice_id": "slice_000000000001"},
-    "build_evidence_pack": {"target_repo": "/tmp/demo-repo", "slice_id": "slice_000000000001"},
-    "read_evidence_pack": {"target_repo": "/tmp/demo-repo", "evidence_pack_id": "evidence_pack_000000000001"},
-    "open_span": {
-        "target_repo": "/tmp/demo-repo",
-        "evidence_pack_id": "evidence_pack_000000000001",
-        "path": "src/main.c",
-        "line_start": 1,
-        "line_end": 2,
-    },
-    "impact_from_paths": {"target_repo": "/tmp/demo-repo", "paths": ["src/main.c"]},
-    "impact_from_anchor": {"target_repo": "/tmp/demo-repo", "anchor_name": "main"},
-    "summarize_impact": {"target_repo": "/tmp/demo-repo", "impact_id": "impact_000000000001"},
-    "render_focus_report": {
-        "target_repo": "/tmp/demo-repo",
-        "evidence_pack_id": "evidence_pack_000000000001",
-        "document_type": "review-report",
-    },
-    "render_module_summary": {
-        "target_repo": "/tmp/demo-repo",
-        "evidence_pack_id": "evidence_pack_000000000001",
-        "module_name": "core",
-    },
-    "render_analysis_outline": {"target_repo": "/tmp/demo-repo", "focus": "entrypoint"},
-    "export_analysis_bundle": {"target_repo": "/tmp/demo-repo", "report_id": "report_000000000001"},
-    "export_scope_snapshot": {"target_repo": "/tmp/demo-repo"},
-    "export_evidence_bundle": {"target_repo": "/tmp/demo-repo", "evidence_pack_id": "evidence_pack_000000000001"},
-}
-
-
-def build_proven_call_repo(tmp_path: Path) -> Path:
-    repo = tmp_path / "proven-call-repo"
-    (repo / "src").mkdir(parents=True, exist_ok=True)
-    (repo / "src" / "impact.c").write_text(
-        "int flash_init(void) { return 0; }\n"
-        "int main(void) { return flash_init(); }\n"
-        "int demo_main(void) { return flash_init(); }\n",
-        encoding="utf-8",
-    )
-    (repo / "src" / "config.h").write_text(
-        "#define FEATURE_FLAG 1\n",
-        encoding="utf-8",
-    )
-    return repo
-
 
 class ToolContractsTest(unittest.TestCase):
-    def _invoke_tool(self, contract_name: str) -> dict:
-        if contract_name not in {
-            "scan_repo",
-            "refresh_scan",
-            "get_scan_status",
-            "show_scope",
-            "list_scope_nodes",
-            "explain_scope_node",
-            "list_anchors",
-            "find_anchor",
-            "describe_anchor",
-            "plan_slice",
-            "expand_slice",
-            "inspect_slice",
-            "build_evidence_pack",
-            "read_evidence_pack",
-            "open_span",
-            "impact_from_paths",
-            "impact_from_anchor",
-            "summarize_impact",
-            "render_focus_report",
-            "render_module_summary",
-            "render_analysis_outline",
-            "export_analysis_bundle",
-            "export_scope_snapshot",
-            "export_evidence_bundle",
-        }:
-            return TOOL_BY_NAME[contract_name](**TOOL_CALL_KWARGS[contract_name])
+    def test_contract_registry_exposes_only_the_new_domains(self) -> None:
+        self.assertEqual(set(DOMAIN_CONTRACTS), {"scan", "query"})
+        self.assertEqual(set(CONTRACT_BY_NAME), EXPECTED_TOOL_NAMES)
+        self.assertTrue(LEGACY_TOOL_NAMES.isdisjoint(CONTRACT_BY_NAME))
 
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo_builder = (
-                build_proven_call_repo
-                if contract_name in {"impact_from_paths", "impact_from_anchor", "summarize_impact"}
-                else build_scope_first_repo
-            )
-            repo = repo_builder(Path(tmpdir))
-            target_repo = str(repo)
-            if contract_name == "scan_repo":
-                return scan_repo(target_repo)
-
-            created = scan_repo(target_repo)
-            if contract_name == "refresh_scan":
-                return TOOL_BY_NAME[contract_name](
-                    target_repo=target_repo,
-                    scan_id=created["data"]["scan_id"],
-                )
-            if contract_name == "show_scope":
-                return show_scope(target_repo, created["data"]["scan_id"])
-            if contract_name == "list_scope_nodes":
-                return list_scope_nodes(target_repo, created["data"]["scan_id"])
-            if contract_name == "explain_scope_node":
-                return explain_scope_node(target_repo, "scope_src", created["data"]["scan_id"])
-            if contract_name == "list_anchors":
-                return list_anchors(target_repo, created["data"]["scan_id"])
-            if contract_name == "find_anchor":
-                return find_anchor(target_repo, "main", created["data"]["scan_id"])
-            if contract_name == "describe_anchor":
-                return describe_anchor(target_repo, "main", created["data"]["scan_id"])
-            if contract_name == "plan_slice":
-                return slice_tools.plan_slice(target_repo, "Where is flash_init defined?")
-            planned = slice_tools.plan_slice(target_repo, "Where is flash_init defined?")
-            if contract_name == "expand_slice":
-                return slice_tools.expand_slice(target_repo, planned["data"]["slice_id"])
-            if contract_name == "inspect_slice":
-                return slice_tools.inspect_slice(target_repo, planned["data"]["slice_id"])
-            if contract_name == "build_evidence_pack":
-                return build_evidence_pack(target_repo, planned["data"]["slice_id"])
-            evidence_pack = build_evidence_pack(target_repo, planned["data"]["slice_id"])
-            if contract_name == "read_evidence_pack":
-                return read_evidence_pack(target_repo, evidence_pack["data"]["evidence_pack_id"])
-            if contract_name == "open_span":
-                return open_span(
-                    target_repo,
-                    evidence_pack["data"]["evidence_pack_id"],
-                    "src/flash.c",
-                    1,
-                    1,
-                )
-            if contract_name == "impact_from_paths":
-                return impact_from_paths(target_repo, ["src/impact.c"], created["data"]["scan_id"])
-            if contract_name == "impact_from_anchor":
-                return impact_from_anchor(target_repo, "flash_init", created["data"]["scan_id"])
-            if contract_name == "summarize_impact":
-                impact_payload = impact_from_paths(target_repo, ["src/impact.c"], created["data"]["scan_id"])
-                return summarize_impact(
-                    target_repo,
-                    impact_payload["data"]["impact_id"],
-                )
-            if contract_name == "render_focus_report":
-                return report_tools.render_focus_report(
-                    target_repo,
-                    evidence_pack["data"]["evidence_pack_id"],
-                    "review-report",
-                )
-            if contract_name == "render_module_summary":
-                return report_tools.render_module_summary(
-                    target_repo,
-                    evidence_pack["data"]["evidence_pack_id"],
-                    "flash",
-                )
-            if contract_name == "render_analysis_outline":
-                return report_tools.render_analysis_outline(target_repo, "entrypoint")
-            if contract_name == "export_scope_snapshot":
-                return export_tools.export_scope_snapshot(target_repo, created["data"]["scan_id"])
-            if contract_name == "export_evidence_bundle":
-                return export_tools.export_evidence_bundle(
-                    target_repo,
-                    evidence_pack["data"]["evidence_pack_id"],
-                )
-            if contract_name == "export_analysis_bundle":
-                report_payload = report_tools.render_module_summary(
-                    target_repo,
-                    evidence_pack["data"]["evidence_pack_id"],
-                    "flash",
-                )
-                return export_tools.export_analysis_bundle(target_repo, report_payload["data"]["report_id"])
-            return TOOL_BY_NAME[contract_name](target_repo=target_repo)
-
-    def test_every_required_domain_group_exists(self) -> None:
-        self.assertEqual(set(DOMAIN_CONTRACTS), EXPECTED_DOMAINS)
-        for domain_name, contracts in DOMAIN_CONTRACTS.items():
-            self.assertEqual(len(contracts), 3, domain_name)
-
-    def test_every_contract_declares_shape_and_failure_modes(self) -> None:
-        for contract in CONTRACT_BY_NAME.values():
-            self.assertTrue(contract.input_schema, contract.name)
-            self.assertTrue(contract.output_schema, contract.name)
-            self.assertTrue(contract.failure_modes, contract.name)
-
-    def test_plan_slice_contract_recommended_next_tools_match_runtime_behavior(self) -> None:
+    def test_contract_schemas_match_the_new_surface(self) -> None:
         self.assertEqual(
-            CONTRACT_BY_NAME["plan_slice"].recommended_next_tools,
-            ("inspect_slice", "build_evidence_pack"),
+            CONTRACT_BY_NAME["rebuild_repo_snapshot"].input_schema,
+            {"target_repo": "string"},
+        )
+        self.assertEqual(
+            CONTRACT_BY_NAME["rebuild_repo_snapshot"].output_schema,
+            {
+                "scan_id": "scan_<12-hex>",
+                "file_count": "int",
+                "symbol_count": "int",
+                "function_count": "int",
+                "call_edge_count": "int",
+            },
+        )
+        self.assertEqual(
+            CONTRACT_BY_NAME["get_file_info"].input_schema,
+            {"scan_id": "scan_<12-hex>", "path": "string"},
+        )
+        self.assertEqual(
+            CONTRACT_BY_NAME["open_symbol_context"].input_schema,
+            {
+                "scan_id": "scan_<12-hex>",
+                "symbol_id": "string",
+                "context_lines": "int",
+            },
+        )
+        self.assertEqual(
+            CONTRACT_BY_NAME["find_call_paths"].output_schema,
+            {
+                "status": "string",
+                "returned_path_count": "int",
+                "truncated": "bool",
+                "paths": "list",
+            },
         )
 
-    def test_contract_names_and_imported_tool_set_stay_aligned(self) -> None:
-        self.assertEqual(set(TOOL_BY_NAME), set(CONTRACT_BY_NAME))
-
-    def test_every_contract_has_callable_stub_tool(self) -> None:
-        for contract_name in CONTRACT_BY_NAME:
-            payload = self._invoke_tool(contract_name)
-            self.assertEqual(payload["status"], "ok", contract_name)
+    def test_imported_tool_set_matches_contract_registry(self) -> None:
+        self.assertEqual(set(TOOL_BY_NAME), EXPECTED_TOOL_NAMES)
 
     def test_tool_signatures_match_contract_input_schemas(self) -> None:
         for contract_name, contract in CONTRACT_BY_NAME.items():
             signature = inspect.signature(TOOL_BY_NAME[contract_name])
             self.assertEqual(set(signature.parameters), set(contract.input_schema), contract_name)
-            for field_name, schema in contract.input_schema.items():
-                parameter = signature.parameters[field_name]
-                is_nullable = schema.endswith("|null")
-                if contract_name == "render_focus_report" and field_name == "document_type":
-                    self.assertEqual(parameter.default, "review-report", f"{contract_name}:{field_name}")
-                elif is_nullable:
-                    self.assertIsNot(parameter.default, inspect._empty, f"{contract_name}:{field_name}")
-                else:
-                    self.assertIs(parameter.default, inspect._empty, f"{contract_name}:{field_name}")
 
-    def test_stub_output_data_keys_match_declared_output_schema(self) -> None:
-        for contract_name, contract in CONTRACT_BY_NAME.items():
-            payload = self._invoke_tool(contract_name)
-            self.assertEqual(set(payload["data"]), set(contract.output_schema), contract_name)
-
-    def test_scan_repo_stub_uses_standard_envelope(self) -> None:
-        payload = stub_payload(
-            "scan_repo",
-            target_repo="/tmp/demo-repo",
-            scan_id="scan_stub000001",
-        )
-        self.assertEqual(payload["schema_version"], "1")
-        self.assertEqual(payload["status"], "ok")
-        self.assertEqual(payload["data"]["scan_id"], "scan_stub000001")
-        self.assertEqual(payload["recommended_next_tools"], ["get_scan_status", "show_scope"])
-
-    def test_export_scope_snapshot_uses_real_scan_id_when_omitted(self) -> None:
+    def test_every_tool_returns_ok_with_real_repo_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-            export_payload = export_scope_snapshot(str(repo))
+            repo = build_query_repo(Path(tmpdir))
+            rebuild_payload = rebuild_repo_snapshot(str(repo))
+            scan_id = rebuild_payload["data"]["scan_id"]
 
-            self.assertEqual(export_payload["status"], "ok")
-            self.assertEqual(export_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertEqual(export_payload["data"]["export_kind"], "scope-snapshot")
-            self.assertTrue(Path(export_payload["data"]["manifest_path"]).is_file())
-            self.assertTrue(Path(export_payload["data"]["payload_path"]).is_file())
-            self.assertEqual(export_payload["data"]["freshness_state"], "fresh")
+            self.assertEqual(set(rebuild_payload["data"]), set(CONTRACT_BY_NAME["rebuild_repo_snapshot"].output_schema))
+            self.assertEqual(rebuild_payload["data"]["file_count"], 5)
+            self.assertGreater(rebuild_payload["data"]["symbol_count"], 0)
+            self.assertGreater(rebuild_payload["data"]["function_count"], 0)
 
-    def test_stub_outputs_do_not_include_undeclared_contract_version(self) -> None:
-        payload = stub_payload("get_scan_status", target_repo="/tmp/demo-repo")
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            tool_payload = get_scan_status(str(repo))
+            priority_payload = list_priority_files(scan_id)
+            file_info_payload = get_file_info(scan_id, "src/main.c")
+            file_symbols_payload = list_file_symbols(scan_id, ["src/main.c", "src/flash.c"])
+            symbol_payload = resolve_symbols(scan_id, "flash_init")
+            symbol_id = symbol_payload["data"]["matches"][0]["symbol_id"]
+            context_payload = open_symbol_context(scan_id, symbol_id, 1)
+            relations_payload = query_call_relations(scan_id, symbol_id)
+            roots_payload = find_root_functions(scan_id, ["src/main.c", "src/flash.c"])
+            paths_payload = find_call_paths(scan_id, roots_payload["data"]["roots"][0]["symbol_id"], symbol_id)
 
-        self.assertNotIn("contract_version", payload["data"])
-        self.assertNotIn("contract_version", tool_payload["data"])
-
-    def test_scan_repo_and_get_scan_status_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-            status = get_scan_status(str(repo))
-
-            self.assertEqual(created["data"]["file_count"], 6)
+            self.assertEqual(priority_payload["status"], "ok")
+            self.assertEqual(priority_payload["data"]["files"][0]["path"], "src/main.c")
+            self.assertEqual(file_info_payload["data"]["path"], "src/main.c")
+            self.assertTrue(file_info_payload["data"]["has_main_definition"])
             self.assertEqual(
-                status["data"]["latest_completed_at"],
-                created["data"]["latest_completed_at"],
+                {row["path"] for row in file_symbols_payload["data"]["files"]},
+                {"src/flash.c", "src/main.c"},
             )
-
-    def test_scope_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            scope_payload = show_scope(str(repo))
-            nodes_payload = list_scope_nodes(str(repo), created["data"]["scan_id"])
-            explain_payload = explain_scope_node(str(repo), "scope_src", created["data"]["scan_id"])
-
-            self.assertEqual(scope_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertEqual(
-                scope_payload["data"]["role_counts"],
-                {"external": 1, "generated": 1, "primary": 3, "support": 1},
-            )
-            self.assertEqual(nodes_payload["data"]["nodes"][0]["node_id"], "scope_demo")
-            self.assertEqual(explain_payload["data"]["related_files"][0], "src/config.h")
-
-    def test_anchor_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            anchors_payload = list_anchors(str(repo), created["data"]["scan_id"])
-            find_payload = find_anchor(str(repo), "main", created["data"]["scan_id"])
-            describe_payload = describe_anchor(str(repo), "main", created["data"]["scan_id"])
-
-            self.assertEqual(anchors_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertTrue(
-                {"EF_USING_ENV", "flash_init", "main"}.issubset(
-                    {anchor["name"] for anchor in anchors_payload["data"]["anchors"]}
-                )
-            )
-            self.assertEqual(find_payload["data"]["matches"][0]["name"], "main")
-            self.assertEqual(describe_payload["data"]["anchor_name"], "main")
-            self.assertIn(
-                "direct_call",
-                {relation["kind"] for relation in describe_payload["data"]["relations"]},
-            )
-
-    def test_slice_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            inspect_payload = slice_tools.inspect_slice(str(repo), plan_payload["data"]["slice_id"])
-            expand_payload = slice_tools.expand_slice(str(repo), plan_payload["data"]["slice_id"])
-
-            self.assertEqual(plan_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertEqual(plan_payload["data"]["query_kind"], "locate_symbol")
-            self.assertEqual(plan_payload["data"]["status"], "complete")
-            self.assertEqual(plan_payload["data"]["selected_files"], ["src/flash.c"])
-            self.assertEqual(plan_payload["data"]["selected_anchor_names"], ["flash_init"])
-            self.assertEqual(plan_payload["data"]["notes"], ["Located definition candidates for flash_init."])
-            self.assertNotIn("M1", plan_payload["messages"][0]["text"])
-            self.assertEqual(
-                plan_payload["recommended_next_tools"],
-                ["inspect_slice", "build_evidence_pack"],
-            )
-            self.assertEqual(inspect_payload["data"]["members"], ["src/flash.c"])
-            self.assertEqual(expand_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
-            self.assertFalse(expand_payload["data"]["expanded"])
-
-    def test_evidence_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-            read_payload = read_evidence_pack(str(repo), build_payload["data"]["evidence_pack_id"])
-            open_payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 1)
-
-            self.assertEqual(build_payload["status"], "ok")
-            self.assertEqual(build_payload["data"]["slice_id"], plan_payload["data"]["slice_id"])
-            self.assertEqual(build_payload["data"]["citation_count"], 1)
-            self.assertEqual(read_payload["data"]["citations"][0]["file_path"], "src/flash.c")
-            self.assertEqual(read_payload["recommended_next_tools"], ["open_span"])
-            self.assertEqual(open_payload["data"]["line_start"], 1)
-            self.assertEqual(open_payload["data"]["line_end"], 1)
-            self.assertEqual(open_payload["data"]["lines"], ["int flash_init(void) { return 0; }"])
-            self.assertEqual(open_payload["recommended_next_tools"], ["read_evidence_pack"])
-
-    def test_impact_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_proven_call_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            paths_payload = impact_from_paths(str(repo), ["src/impact.c"], created["data"]["scan_id"])
-            anchor_payload = impact_from_anchor(str(repo), "flash_init", created["data"]["scan_id"])
-            summary_payload = summarize_impact(
-                str(repo),
-                paths_payload["data"]["impact_id"],
-            )
-
-            self.assertEqual(paths_payload["status"], "ok")
-            self.assertRegex(paths_payload["data"]["impact_id"], r"^impact_[0-9a-f]{12}$")
-            self.assertEqual(paths_payload["data"]["changed_paths"], ["src/impact.c"])
-            self.assertIn(
-                "src/impact.c",
-                {item["path"] for item in paths_payload["data"]["likely_propagation"]},
-            )
-            self.assertIn(
-                "main",
-                {item["anchor_name"] for item in paths_payload["data"]["likely_propagation"]},
-            )
-            self.assertIn(
-                "demo_main",
-                {item["anchor_name"] for item in paths_payload["data"]["likely_propagation"]},
-            )
-            self.assertEqual(
-                paths_payload["recommended_next_tools"],
-                ["summarize_impact", "plan_slice"],
-            )
-
-            self.assertEqual(anchor_payload["status"], "ok")
-            self.assertEqual(anchor_payload["data"]["seed_kind"], "anchor")
-            self.assertEqual(anchor_payload["data"]["anchor_name"], "flash_init")
-
-            self.assertEqual(summary_payload["status"], "ok")
-            self.assertEqual(summary_payload["data"]["impact_id"], paths_payload["data"]["impact_id"])
-            self.assertTrue(summary_payload["data"]["risks"])
-            self.assertTrue(summary_payload["data"]["summary"])
-            self.assertEqual(
-                summary_payload["recommended_next_tools"],
-                ["plan_slice", "build_evidence_pack"],
-            )
-
-    def test_report_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-
-            module_payload = report_tools.render_module_summary(
-                str(repo),
-                build_payload["data"]["evidence_pack_id"],
-                "flash",
-            )
-            focus_payload = report_tools.render_focus_report(
-                str(repo),
-                build_payload["data"]["evidence_pack_id"],
-                "issue-analysis",
-            )
-
-            self.assertEqual(module_payload["data"]["document_type"], "module-summary")
-            self.assertIn("markdown_path", module_payload["data"])
-            self.assertEqual(focus_payload["data"]["document_type"], "issue-analysis")
-
-    def test_export_tools_use_real_services(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-            report_payload = report_tools.render_module_summary(
-                str(repo),
-                build_payload["data"]["evidence_pack_id"],
-                "flash",
-            )
-
-            scope_payload = export_tools.export_scope_snapshot(str(repo), created["data"]["scan_id"])
-            evidence_payload = export_tools.export_evidence_bundle(
-                str(repo),
-                build_payload["data"]["evidence_pack_id"],
-            )
-            analysis_payload = export_tools.export_analysis_bundle(
-                str(repo),
-                report_payload["data"]["report_id"],
-            )
-
-            self.assertEqual(scope_payload["status"], "ok")
-            self.assertEqual(scope_payload["data"]["export_kind"], "scope-snapshot")
-            self.assertEqual(scope_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertTrue(Path(scope_payload["data"]["manifest_path"]).is_file())
-            self.assertTrue(Path(scope_payload["data"]["payload_path"]).is_file())
-            self.assertEqual(scope_payload["data"]["freshness_state"], "fresh")
-
-            self.assertEqual(evidence_payload["status"], "ok")
-            self.assertEqual(evidence_payload["data"]["export_kind"], "evidence-bundle")
-            self.assertEqual(
-                evidence_payload["data"]["evidence_pack_id"],
-                build_payload["data"]["evidence_pack_id"],
-            )
-            self.assertEqual(evidence_payload["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertTrue(Path(evidence_payload["data"]["manifest_path"]).is_file())
-            self.assertTrue(Path(evidence_payload["data"]["payload_path"]).is_file())
-
-            self.assertEqual(analysis_payload["status"], "ok")
-            self.assertEqual(analysis_payload["data"]["export_kind"], "analysis-bundle")
-            self.assertEqual(analysis_payload["data"]["report_id"], report_payload["data"]["report_id"])
-            self.assertTrue(Path(analysis_payload["data"]["manifest_path"]).is_file())
-            self.assertTrue(Path(analysis_payload["data"]["payload_path"]).is_file())
-            self.assertTrue(Path(analysis_payload["data"]["copied_markdown_path"]).is_file())
-            self.assertEqual(analysis_payload["data"]["freshness_state"], "fresh")
-
-    def test_render_focus_report_returns_invalid_input_for_unsupported_document_type(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-
-            payload = report_tools.render_focus_report(
-                str(repo),
-                build_payload["data"]["evidence_pack_id"],
-                "unsupported",
-            )
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
-
-    def test_open_span_returns_invalid_input_when_request_exceeds_evidence_bounds(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-
-            payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 2)
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
-
-    def test_open_span_returns_invalid_input_when_cited_file_has_drifted(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-            plan_payload = slice_tools.plan_slice(str(repo), "Where is flash_init defined?")
-            build_payload = build_evidence_pack(str(repo), plan_payload["data"]["slice_id"])
-            (repo / "src" / "flash.c").write_text("int flash_init(void) { return 9; }\n", encoding="utf-8")
-
-            payload = open_span(str(repo), build_payload["data"]["evidence_pack_id"], "src/flash.c", 1, 1)
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
-
-    def test_describe_anchor_reports_direct_call_relation_for_easyflash_fixture(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = materialize_easyflash_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            payload = describe_anchor(str(repo), "easyflash_init", created["data"]["scan_id"])
-
-            self.assertEqual(payload["status"], "ok")
-            self.assertIn("easyflash/src/easyflash.c", payload["data"]["description"])
-            self.assertIn(
-                "ef_port_init",
-                {
-                    relation["target_name"]
-                    for relation in payload["data"]["relations"]
-                    if relation["kind"] == "direct_call"
-                },
-            )
-
-    def test_refresh_scan_returns_error_for_unknown_scan_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = refresh_scan(str(repo), "scan_deadbeefcafe")
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "not_found")
-            self.assertEqual(payload["recommended_next_tools"], [])
-
-    def test_refresh_scan_rejects_malformed_scan_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = refresh_scan(str(repo), "../escape")
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
-
-    def test_get_scan_status_returns_error_when_no_scan_exists(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = get_scan_status(str(repo))
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "not_found")
-
-    def test_get_scan_status_rejects_malformed_scan_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = get_scan_status(str(repo), "../escape")
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+            self.assertEqual(symbol_payload["data"]["match_count"], 2)
+            self.assertEqual(context_payload["data"]["path"], "src/flash.c")
+            self.assertEqual(relations_payload["data"]["callers"][0]["name"], "main")
+            self.assertEqual(roots_payload["data"]["roots"][0]["name"], "main")
+            self.assertEqual(paths_payload["data"]["status"], "found")

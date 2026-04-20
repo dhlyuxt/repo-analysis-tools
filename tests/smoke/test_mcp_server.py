@@ -8,6 +8,19 @@ import time
 import unittest
 
 
+EXPECTED_TOOL_NAMES = {
+    "rebuild_repo_snapshot",
+    "list_priority_files",
+    "get_file_info",
+    "list_file_symbols",
+    "resolve_symbols",
+    "open_symbol_context",
+    "query_call_relations",
+    "find_root_functions",
+    "find_call_paths",
+}
+
+
 class McpServerSmokeTest(unittest.TestCase):
     def test_server_process_starts_under_stdio(self) -> None:
         src_root = Path(__file__).resolve().parents[2] / "src"
@@ -111,7 +124,7 @@ class McpServerSmokeTest(unittest.TestCase):
             tools_response = json.loads(tools_response_line)
             self.assertEqual(tools_response["id"], 2)
             tool_names = [tool["name"] for tool in tools_response["result"]["tools"]]
-            self.assertIn("scan_repo", tool_names)
+            self.assertEqual(set(tool_names), EXPECTED_TOOL_NAMES)
         finally:
             if process.poll() is None:
                 try:

@@ -6,7 +6,8 @@ from unittest import mock
 from repo_analysis_tools.anchors.store import AnchorStore
 from repo_analysis_tools.anchors.service import AnchorService
 from repo_analysis_tools.core.errors import ErrorCode
-from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
+from repo_analysis_tools.mcp.scan_registry import repo_root_for_scan
+from repo_analysis_tools.mcp.tools.scan_tools import rebuild_repo_snapshot
 from repo_analysis_tools.scan.service import ScanService
 from repo_analysis_tools.scan.store import ScanStore
 from repo_analysis_tools.scope.store import ScopeStore
@@ -90,74 +91,36 @@ class ScanServiceTest(unittest.TestCase):
             self.assertEqual(stored.scan_id, result.scan_id)
             self.assertIn("main", {anchor.name for anchor in stored.anchors})
 
-    def test_scan_tools_return_real_payloads(self) -> None:
+    def test_rebuild_repo_snapshot_returns_real_payload_and_registers_repo_root(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-            status = get_scan_status(str(repo))
+            payload = rebuild_repo_snapshot(str(repo))
 
-            self.assertEqual(created["status"], "ok")
-            self.assertRegex(created["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
-            self.assertEqual(created["data"]["file_count"], 6)
-            self.assertEqual(status["data"]["scan_id"], created["data"]["scan_id"])
+            self.assertEqual(payload["status"], "ok")
+            self.assertEqual(payload["messages"], [])
+            self.assertRegex(payload["data"]["scan_id"], r"^scan_[0-9a-f]{12}$")
+            self.assertEqual(payload["data"]["file_count"], 6)
+            self.assertGreater(payload["data"]["symbol_count"], 0)
+            self.assertEqual(repo_root_for_scan(payload["data"]["scan_id"]), str(repo.resolve()))
 
-    def test_refresh_scan_rejects_unknown_scan_id(self) -> None:
+    def test_rebuild_repo_snapshot_rejects_unknown_repo_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
+            repo = Path(tmpdir) / "missing-repo"
 
-            payload = refresh_scan(str(repo), "scan_deadbeefcafe")
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
-
-    def test_refresh_scan_rescans_when_scan_id_exists(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            created = scan_repo(str(repo))
-
-            refreshed = refresh_scan(str(repo), created["data"]["scan_id"])
-            status = get_scan_status(str(repo))
-
-            self.assertEqual(refreshed["status"], "ok")
-            self.assertNotEqual(refreshed["data"]["scan_id"], created["data"]["scan_id"])
-            self.assertEqual(status["data"]["scan_id"], refreshed["data"]["scan_id"])
-
-    def test_refresh_scan_rejects_malformed_scan_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = refresh_scan(str(repo), "../escape")
+            payload = rebuild_repo_snapshot(str(repo))
 
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
 
-    def test_get_scan_status_rejects_malformed_scan_id(self) -> None:
+    def test_rebuild_repo_snapshot_rejects_non_directory_repo_path(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
+            repo = Path(tmpdir) / "repo.txt"
+            repo.write_text("not a directory", encoding="utf-8")
 
-            payload = get_scan_status(str(repo), "../escape")
+            payload = rebuild_repo_snapshot(str(repo))
 
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
-
-    def test_get_scan_status_returns_not_found_when_repo_has_no_scans(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-
-            payload = get_scan_status(str(repo))
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
-
-    def test_get_scan_status_returns_not_found_for_missing_scan_id(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_repo(str(repo))
-
-            payload = get_scan_status(str(repo), "scan_deadbeefcafe")
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
 
     def test_scan_service_marks_workspace_dirty_for_untracked_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

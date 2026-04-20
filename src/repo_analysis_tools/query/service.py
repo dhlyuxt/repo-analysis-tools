@@ -83,6 +83,7 @@ class QueryService:
             raise ValueError("context_lines must not be negative")
         anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
         anchor = self._find_anchor(anchor_snapshot.anchors, symbol_id)
+        anchor = self._preferred_definition_anchor(anchor_snapshot.anchors, anchor)
         repo = Path(target_repo).expanduser().resolve()
         source_lines = (repo / anchor.path).read_text(encoding="utf-8", errors="ignore").splitlines()
         definition_start = anchor.start_line
@@ -92,7 +93,7 @@ class QueryService:
         return SymbolContextRow(
             symbol_id=anchor.anchor_id,
             name=anchor.name,
-            kind=anchor.kind,
+            kind=self._normalized_symbol_kind(anchor),
             path=anchor.path,
             definition_line_start=definition_start,
             definition_line_end=definition_end,
@@ -143,7 +144,7 @@ class QueryService:
         return SymbolRow(
             symbol_id=anchor.anchor_id,
             name=anchor.name,
-            kind=anchor.kind,
+            kind=self._normalized_symbol_kind(anchor),
             path=anchor.path,
             line_start=anchor.start_line,
             line_end=anchor.end_line,
@@ -178,6 +179,27 @@ class QueryService:
             if anchor.anchor_id == symbol_id:
                 return anchor
         raise FileNotFoundError(f"symbol {symbol_id} was not found")
+
+    def _preferred_definition_anchor(self, anchors: list[AnchorRecord], anchor: AnchorRecord) -> AnchorRecord:
+        if anchor.kind != "function_declaration":
+            return anchor
+        definitions = [
+            candidate
+            for candidate in anchors
+            if candidate.kind == "function_definition" and candidate.name == anchor.name
+        ]
+        if len(definitions) == 1:
+            return definitions[0]
+        return anchor
+
+    def _normalized_symbol_kind(self, anchor: AnchorRecord) -> str:
+        if anchor.kind in {"function_definition", "function_declaration"}:
+            return "function"
+        if anchor.kind == "type_definition":
+            return "type"
+        if anchor.kind == "macro_definition":
+            return "macro"
+        return "variable"
 
     def _normalize_repo_path(self, path: str) -> str:
         raw_path = PurePosixPath(path)

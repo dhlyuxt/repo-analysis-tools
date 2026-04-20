@@ -62,10 +62,7 @@ class QueryService:
     ) -> SymbolMatchResult:
         normalized_name = self._validated_symbol_name(symbol_name)
         anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
-        exact_matches = [anchor for anchor in anchor_snapshot.anchors if anchor.name == normalized_name]
-        anchors = exact_matches if exact_matches else [
-            anchor for anchor in anchor_snapshot.anchors if normalized_name.lower() in anchor.name.lower()
-        ]
+        anchors = [anchor for anchor in anchor_snapshot.anchors if anchor.name == normalized_name]
         rows = tuple(
             self._symbol_row_from_anchor(anchor, target_repo)
             for anchor in sorted(anchors, key=self._symbol_sort_key)
@@ -86,8 +83,8 @@ class QueryService:
         anchor = self._preferred_definition_anchor(anchor_snapshot.anchors, anchor)
         repo = Path(target_repo).expanduser().resolve()
         source_lines = (repo / anchor.path).read_text(encoding="utf-8", errors="ignore").splitlines()
+        definition_end = self._definition_end_line(anchor, source_lines)
         definition_start = anchor.start_line
-        definition_end = anchor.end_line
         context_start = max(1, definition_start - context_lines)
         context_end = min(len(source_lines), definition_end + context_lines)
         return SymbolContextRow(
@@ -191,6 +188,25 @@ class QueryService:
         if len(definitions) == 1:
             return definitions[0]
         return anchor
+
+    def _definition_end_line(self, anchor: AnchorRecord, source_lines: list[str]) -> int:
+        if anchor.kind != "function_definition":
+            return anchor.end_line
+        if anchor.start_line <= 0 or anchor.start_line > len(source_lines):
+            return anchor.end_line
+
+        brace_depth = 0
+        saw_open_brace = False
+        for line_index in range(anchor.start_line - 1, len(source_lines)):
+            for character in source_lines[line_index]:
+                if character == "{":
+                    brace_depth += 1
+                    saw_open_brace = True
+                elif character == "}" and saw_open_brace:
+                    brace_depth -= 1
+                    if brace_depth == 0:
+                        return line_index + 1
+        return anchor.end_line
 
     def _normalized_symbol_kind(self, anchor: AnchorRecord) -> str:
         if anchor.kind in {"function_definition", "function_declaration"}:

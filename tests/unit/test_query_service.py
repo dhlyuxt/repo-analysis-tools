@@ -52,11 +52,23 @@ class QueryServiceTest(unittest.TestCase):
                 repo,
                 scan_snapshot.scan_id,
                 declaration_symbol.symbol_id,
-                1,
+                0,
             )
 
             self.assertEqual(symbol_context.path, "src/flash.c")
             self.assertEqual(symbol_context.definition_line_start, 2)
-            self.assertEqual(symbol_context.definition_line_end, 3)
-            self.assertIn("flash init comment", symbol_context.lines[0])
+            self.assertEqual(symbol_context.definition_line_end, 4)
+            self.assertTrue(symbol_context.lines[0].startswith("int flash_init(void)"))
+            self.assertEqual(symbol_context.lines[-1], "}")
             self.assertNotIn("int flash_init(void);", "\n".join(symbol_context.lines))
+
+    def test_resolve_symbols_does_not_return_substring_matches(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            symbol_matches = service.resolve_symbols(repo, scan_snapshot.scan_id, "flash")
+
+            self.assertEqual(symbol_matches.match_count, 0)
+            self.assertEqual(symbol_matches.matches, ())

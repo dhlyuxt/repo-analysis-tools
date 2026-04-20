@@ -19,15 +19,13 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
         )
 
         payload = json.loads(result.stdout)
-        repo_root = Path(payload["repo_root"])
-        markdown_path = Path(payload["markdown_path"])
-        copied_markdown_path = Path(payload["copied_markdown_path"])
-
-        self.assertTrue(repo_root.is_dir())
+        self.assertEqual(
+            set(payload),
+            {"scan_id", "symbol_name", "priority_files", "caller_count", "call_path_status"},
+        )
         self.assertRegex(payload["scan_id"], r"^scan_[0-9a-f]{12}$")
-        self.assertRegex(payload["evidence_pack_id"], r"^evidence_pack_[0-9a-f]{12}$")
-        self.assertRegex(payload["impact_id"], r"^impact_[0-9a-f]{12}$")
-        self.assertRegex(payload["report_id"], r"^report_[0-9a-f]{12}$")
-        self.assertRegex(payload["export_id"], r"^export_[0-9a-f]{12}$")
-        self.assertTrue(markdown_path.is_file())
-        self.assertTrue(copied_markdown_path.is_file())
+        self.assertEqual(payload["symbol_name"], "easyflash_init")
+        self.assertIsInstance(payload["priority_files"], list)
+        self.assertGreater(len(payload["priority_files"]), 0)
+        self.assertGreaterEqual(payload["caller_count"], 0)
+        self.assertIn(payload["call_path_status"], {"found", "no_path", "truncated"})

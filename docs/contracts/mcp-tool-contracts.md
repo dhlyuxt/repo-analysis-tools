@@ -1,6 +1,6 @@
 # MCP Tool Contracts
 
-This document records the current runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. It mirrors the real analysis-first mainline behavior rather than the old M1 stub baseline.
+This document records the current runtime contract surface for `src/repo_analysis_tools/mcp/contracts/`. The active surface is query-first and consists of `rebuild_repo_snapshot` plus the eight query tools.
 
 ## Standard Response Envelope
 
@@ -16,18 +16,13 @@ All tool responses use the same outer envelope:
 
 ## Stable ID Families
 
-The current contract set uses these stable ID families:
+The current contract set uses one active stable ID family:
 
 - `scan`: emitted as `scan_<12-hex>`
-- `slice`: emitted as `slice_<12-hex>`
-- `evidence_pack`: emitted as `evidence_pack_<12-hex>`
-- `impact`: emitted as `impact_<12-hex>`
-- `report`: emitted as `report_<12-hex>`
-- `export`: emitted as `export_<12-hex>`
 
 ## Standard Failure Modes
 
-The contract surface currently reuses the shared MCP-facing error taxonomy:
+The contract surface reuses the shared MCP-facing error taxonomy:
 
 - `invalid_input`
 - `not_found`
@@ -35,83 +30,35 @@ The contract surface currently reuses the shared MCP-facing error taxonomy:
 - `runtime_state`
 - `internal`
 
-## Analysis-First Mainline
+## Query-First Mainline
 
 The supported mainline path is:
 
 ```text
-scan_repo
--> get_scan_status
--> show_scope
--> list_anchors / find_anchor / describe_anchor
--> plan_slice
--> build_evidence_pack
--> read_evidence_pack
--> open_span
+rebuild_repo_snapshot
+-> list_priority_files
+-> get_file_info
+-> list_file_symbols / resolve_symbols
+-> open_symbol_context / query_call_relations / find_root_functions / find_call_paths
 ```
 
-Contract consumers should treat `read_evidence_pack` as the handoff point from structured evidence to raw source access. `open_span` remains bounded by evidence citations and `MAX_OPEN_SPAN_LINES`; it is not a generic repository reader.
+`rebuild_repo_snapshot` must run first in the current process so it can record the returned `scan_id` in the in-memory scan registry. Query tools read that registry instead of accepting `target_repo`, which keeps the surface query-first and prevents repeated repo-path plumbing.
 
 ## `scan`
 
 | Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
 | --- | --- | --- | --- | --- | --- |
-| `scan_repo` | `target_repo` | `target_repo`, `runtime_root`, `scan_id`, `repo_root`, `file_count`, `latest_completed_at`, `git_head`, `workspace_dirty` | `scan` | `invalid_input`, `runtime_state`, `internal` | `get_scan_status`, `show_scope` |
-| `refresh_scan` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `repo_root`, `file_count`, `latest_completed_at`, `git_head`, `workspace_dirty` | `scan` | `invalid_input`, `not_found`, `internal` | `get_scan_status`, `show_scope` |
-| `get_scan_status` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `repo_root`, `file_count`, `latest_completed_at`, `git_head`, `workspace_dirty` | `scan` | `invalid_input`, `not_found`, `internal` | `show_scope`, `list_anchors` |
+| `rebuild_repo_snapshot` | `target_repo` | `scan_id`, `file_count`, `symbol_count`, `function_count`, `call_edge_count` | `scan` | `invalid_input`, `runtime_state`, `internal` | `list_priority_files`, `get_file_info` |
 
-## `scope`
+## `query`
 
 | Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
 | --- | --- | --- | --- | --- | --- |
-| `show_scope` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `scope_summary`, `role_counts` | `scan` | `invalid_input`, `not_found`, `internal` | `list_scope_nodes`, `list_anchors` |
-| `list_scope_nodes` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `nodes` | `scan` | `invalid_input`, `not_found`, `internal` | `explain_scope_node`, `list_anchors` |
-| `explain_scope_node` | `target_repo`, `scan_id`, `node_id` | `target_repo`, `runtime_root`, `scan_id`, `node_id`, `summary`, `related_files` | `scan` | `invalid_input`, `not_found`, `internal` | `list_anchors`, `plan_slice` |
-
-## `anchors`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `list_anchors` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `anchors` | `scan` | `invalid_input`, `not_found`, `internal` | `find_anchor`, `plan_slice` |
-| `find_anchor` | `target_repo`, `scan_id`, `anchor_name` | `target_repo`, `runtime_root`, `scan_id`, `anchor_name`, `matches` | `scan` | `invalid_input`, `not_found`, `internal` | `describe_anchor`, `plan_slice` |
-| `describe_anchor` | `target_repo`, `scan_id`, `anchor_name` | `target_repo`, `runtime_root`, `scan_id`, `anchor_name`, `description`, `relations` | `scan` | `invalid_input`, `not_found`, `internal` | `plan_slice`, `impact_from_anchor` |
-
-## `slice`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `plan_slice` | `target_repo`, `question` | `target_repo`, `runtime_root`, `slice_id`, `scan_id`, `query_kind`, `status`, `selected_files`, `selected_anchor_names`, `notes` | `slice` | `invalid_input`, `not_found`, `internal` | `inspect_slice`, `build_evidence_pack` |
-| `expand_slice` | `target_repo`, `slice_id` | `target_repo`, `runtime_root`, `slice_id`, `expanded` | `slice` | `invalid_input`, `not_found`, `internal` | `inspect_slice`, `build_evidence_pack` |
-| `inspect_slice` | `target_repo`, `slice_id` | `target_repo`, `runtime_root`, `slice_id`, `members` | `slice` | `invalid_input`, `not_found`, `internal` | `build_evidence_pack`, `render_focus_report` |
-
-## `evidence`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `build_evidence_pack` | `target_repo`, `slice_id` | `target_repo`, `runtime_root`, `slice_id`, `evidence_pack_id`, `citation_count`, `summary` | `slice`, `evidence_pack` | `invalid_input`, `not_found`, `internal` | `read_evidence_pack`, `open_span` |
-| `read_evidence_pack` | `target_repo`, `evidence_pack_id` | `target_repo`, `runtime_root`, `evidence_pack_id`, `summary`, `citations` | `evidence_pack` | `invalid_input`, `not_found`, `internal` | `open_span` |
-| `open_span` | `target_repo`, `evidence_pack_id`, `path`, `line_start`, `line_end` | `target_repo`, `runtime_root`, `evidence_pack_id`, `path`, `line_start`, `line_end`, `lines` | `evidence_pack` | `invalid_input`, `not_found`, `internal` | `read_evidence_pack` |
-
-## `impact`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `impact_from_paths` | `target_repo`, `scan_id`, `paths` | `target_repo`, `runtime_root`, `scan_id`, `impact_id`, `seed_kind`, `changed_paths`, `direct_impacts`, `likely_propagation`, `uncertainty_notes`, `recommended_regression_focus`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `plan_slice` |
-| `impact_from_anchor` | `target_repo`, `scan_id`, `anchor_name` | `target_repo`, `runtime_root`, `scan_id`, `impact_id`, `seed_kind`, `anchor_name`, `direct_impacts`, `likely_propagation`, `uncertainty_notes`, `recommended_regression_focus`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `summarize_impact`, `plan_slice` |
-| `summarize_impact` | `target_repo`, `impact_id` | `target_repo`, `runtime_root`, `impact_id`, `scan_id`, `confirmed_impact`, `likely_propagation`, `regression_focus`, `blind_spots`, `risks`, `summary` | `scan`, `impact` | `invalid_input`, `not_found`, `internal` | `plan_slice`, `build_evidence_pack` |
-
-## `report`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `render_focus_report` | `target_repo`, `evidence_pack_id`, `document_type` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id`, `document_type`, `title`, `markdown_path` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_module_summary`, `export_analysis_bundle` |
-| `render_module_summary` | `target_repo`, `evidence_pack_id`, `module_name` | `target_repo`, `runtime_root`, `evidence_pack_id`, `report_id`, `document_type`, `title`, `markdown_path` | `evidence_pack`, `report` | `invalid_input`, `not_found`, `internal` | `render_analysis_outline`, `export_analysis_bundle` |
-| `render_analysis_outline` | `target_repo`, `focus` | `target_repo`, `runtime_root`, `report_id`, `document_type`, `title`, `markdown_path`, `sections` | `report` | `invalid_input`, `not_found`, `internal` | `export_analysis_bundle`, `export_scope_snapshot` |
-
-## `export`
-
-| Tool | Inputs | Outputs | Stable IDs | Failure modes | Next tools |
-| --- | --- | --- | --- | --- | --- |
-| `export_analysis_bundle` | `target_repo`, `report_id` | `target_repo`, `runtime_root`, `report_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `copied_markdown_path`, `freshness_state` | `report`, `export` | `invalid_input`, `not_found`, `internal` | `export_scope_snapshot`, `export_evidence_bundle` |
-| `export_scope_snapshot` | `target_repo`, `scan_id` | `target_repo`, `runtime_root`, `scan_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `freshness_state` | `scan`, `export` | `invalid_input`, `not_found`, `internal` | `export_evidence_bundle` |
-| `export_evidence_bundle` | `target_repo`, `evidence_pack_id` | `target_repo`, `runtime_root`, `evidence_pack_id`, `scan_id`, `export_id`, `export_kind`, `manifest_path`, `payload_path`, `freshness_state` | `evidence_pack`, `export` | `invalid_input`, `not_found`, `internal` | none |
+| `list_priority_files` | `scan_id` | `files` | none | `invalid_input`, `not_found`, `internal` | `get_file_info`, `list_file_symbols` |
+| `get_file_info` | `scan_id`, `path` | `path`, `role`, `priority_score`, `line_count`, `symbol_count`, `function_count`, `type_count`, `macro_count`, `include_count`, `incoming_call_count`, `outgoing_call_count`, `root_function_count`, `has_main_definition` | none | `invalid_input`, `not_found`, `internal` | `list_file_symbols`, `find_root_functions` |
+| `list_file_symbols` | `scan_id`, `paths` | `files` | none | `invalid_input`, `not_found`, `internal` | `open_symbol_context`, `resolve_symbols` |
+| `resolve_symbols` | `scan_id`, `symbol_name` | `match_count`, `matches` | none | `invalid_input`, `not_found`, `internal` | `open_symbol_context`, `query_call_relations` |
+| `open_symbol_context` | `scan_id`, `symbol_id`, `context_lines` | `symbol_id`, `name`, `kind`, `path`, `definition_line_start`, `definition_line_end`, `context_line_start`, `context_line_end`, `lines` | none | `invalid_input`, `not_found`, `internal` | `query_call_relations`, `find_call_paths` |
+| `query_call_relations` | `scan_id`, `function_id` | `callers`, `callees`, `non_resolved_callees` | none | `invalid_input`, `not_found`, `internal` | `find_call_paths`, `find_root_functions` |
+| `find_root_functions` | `scan_id`, `paths` | `roots` | none | `invalid_input`, `not_found`, `internal` | `find_call_paths`, `open_symbol_context` |
+| `find_call_paths` | `scan_id`, `from_function_id`, `to_function_id` | `status`, `returned_path_count`, `truncated`, `paths` | none | `invalid_input`, `not_found`, `internal` | `open_symbol_context`, `query_call_relations` |

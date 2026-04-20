@@ -1,6 +1,6 @@
-# M2 Analysis-First Mainline Architecture
+# Query-First Architecture
 
-This document records the architecture seams that the analysis-first mainline must preserve while real repository-understanding behavior is added.
+This document records the architecture seams that the active query-first MCP surface must preserve.
 
 ## Package Boundaries
 
@@ -9,112 +9,46 @@ The repository keeps a visible top-level split between:
 - `core`: shared IDs, path rules, envelope helpers, and common error types.
 - `storage`: domain-owned runtime directories and persistence boundaries.
 - `scan`: repository scan lifecycle and scan handles.
-- `scope`: scope summaries and scope-node views derived from scans.
-- `anchors`: anchor discovery and anchor descriptions.
-- `slice`: slice planning, expansion, and inspection.
-- `evidence`: evidence pack creation, reading, and source span access.
-- `impact`: impact analysis from paths, anchors, or broader focus areas.
-- `report`: report rendering before export.
-- `export`: externalized bundles and snapshots.
+- `scope`: persisted file facts derived from scans.
+- `anchors`: anchor discovery and call-relation persistence.
+- `query`: query orchestration across scan, scope, and anchor stores.
 - `mcp`: server bootstrap, registry, contracts, and tool adapters.
 - `skills`: workflow-facing skill packaging.
-- `doc_specs`: typed document intent models.
-- `doc_dsl`: document-building primitives and validation.
-- `renderers`: output renderers for structured documents.
 - `tests`: contract, unit, integration, and golden verification layers.
 
-The intended workflow spine remains `scan -> scope -> anchors -> slice -> evidence -> impact -> report -> export`.
+The intended workflow spine is `scan -> scope -> anchors -> query`.
 
-## M2 Mainline Handoff
+## Query-First Handoff
 
-M2 makes the repository-understanding path real for Codex sessions:
-
-```text
-scan_repo
--> get_scan_status
--> show_scope
--> list_anchors / find_anchor / describe_anchor
--> plan_slice
--> build_evidence_pack
--> read_evidence_pack
--> open_span
-```
-
-The supported persistence model is JSON-first and domain-owned. Each scan writes runtime assets under `<target_repo>/.codewiki/` in domain-specific directories so later steps can reopen prior results without recomputing everything:
-
-- `scan` stores scan snapshots and the latest scan pointer.
-- `scope` stores scope snapshots derived from scans.
-- `anchors` stores extracted anchors and anchor relations.
-- `slice` stores slice manifests and slice inspection state.
-- `evidence` stores evidence packs and the citations they reopen.
-- `impact` stores persisted impact results and the latest impact pointer.
-
-`open_span` is intentionally bounded. It may only open a span that is fully covered by an evidence citation, and it must still respect `MAX_OPEN_SPAN_LINES` from the evidence service. It is not a generic file browser and must not be used to inspect arbitrary repository text outside the cited evidence path.
-
-## M3 Change-Impact Handoff
-
-M3 makes the change-impact path real for Codex sessions:
+The active MCP path for repository understanding is:
 
 ```text
-refresh_scan
--> impact_from_paths / impact_from_anchor
--> summarize_impact
--> inspect related anchors or slices
--> build_evidence_pack
+rebuild_repo_snapshot
+-> list_priority_files
+-> get_file_info
+-> list_file_symbols / resolve_symbols
+-> open_symbol_context / query_call_relations / find_root_functions / find_call_paths
 ```
 
-The persisted impact artifacts live under `<target_repo>/.codewiki/impact/`:
+The active tools are:
 
-- `latest.json` stores the latest impact pointer.
-- `results/impact_<12-hex>.json` stores the full impact record for later summary and evidence handoff.
+- `rebuild_repo_snapshot`
+- `list_priority_files`
+- `get_file_info`
+- `list_file_symbols`
+- `resolve_symbols`
+- `open_symbol_context`
+- `query_call_relations`
+- `find_root_functions`
+- `find_call_paths`
 
-This handoff is intentionally conservative. Clients must distinguish confirmed impact, likely propagation, and blind spots instead of collapsing them into one certainty bucket.
+The supported persistence model is JSON-first and domain-owned. Each rebuild writes runtime assets under `<target_repo>/.codewiki/` in domain-specific directories so later query steps can reopen prior results without recomputing everything:
 
-## M4 Document Handoff
+- `<target_repo>/.codewiki/scan/` stores scan snapshots and the latest scan pointer.
+- `<target_repo>/.codewiki/scope/` stores file facts derived from scans.
+- `<target_repo>/.codewiki/anchors/` stores extracted anchors and call relations.
 
-M4 makes the analysis-writing path real for Codex sessions:
-
-```text
-plan_slice / summarize_impact
--> build_evidence_pack
--> render_focus_report / render_module_summary / render_analysis_outline
--> persisted report artifact
-```
-
-The persisted report artifacts live under `<target_repo>/.codewiki/report/`:
-
-- `latest.json` stores the latest report pointer.
-- `results/report_<12-hex>.json` stores report metadata.
-- `rendered/report_<12-hex>.md` stores the final Markdown output.
-
-## M5 Export Handoff
-
-M5 makes export reuse real for Codex sessions:
-
-```text
-get_scan_status / refresh_scan
--> export_scope_snapshot / export_evidence_bundle / export_analysis_bundle
--> inspect manifest freshness
--> hand recovered IDs or bundle paths to follow-up workflows
-```
-
-The persisted export artifacts live under `<target_repo>/.codewiki/export/`:
-
-- `latest.json` stores the latest export pointer.
-- `results/export_<12-hex>.json` stores export metadata and freshness ownership fields.
-- `bundles/export_<12-hex>/manifest.json` stores the reusable export manifest.
-- `bundles/export_<12-hex>/payload.json` stores the copied structured payload.
-- `bundles/export_<12-hex>/report.md` stores the copied Markdown artifact for analysis bundles.
-
-Freshness ownership fields are recorded so later workflows can decide whether reuse is safe:
-
-- `source_kind` records whether the export came from `scope`, `evidence`, or `report`.
-- `source_id` records the stable ID of the exported source artifact.
-- `owner_tool` records which export tool created the bundle.
-- `freshness` records the freshness state, summary, and drifted paths.
-- `copied_paths` records the bundle-local files that were written for reuse.
-
-The `analysis-maintenance` skill captures this handoff for operators who need to inspect freshness before resuming later workflows.
+`rebuild_repo_snapshot` must complete before any query tool is used in the same process. The process-local `scan_id -> repo_root` registry is what lets the query wrappers recover the repo root without accepting a `target_repo` argument.
 
 ## Runtime Root And Path Rules
 
@@ -128,16 +62,12 @@ The runtime contract is:
 
 ## Stable Identifier Families
 
-M1 reserves these stable ID prefixes for reusable artifacts:
+The active surface reserves one stable ID prefix for reusable artifacts:
 
 | Artifact | Prefix | Notes |
 | --- | --- | --- |
 | scan handle | `scan_` | Used for scan lifecycle and scan-derived reads. |
-| slice handle | `slice_` | Used for slice planning and later expansion. |
-| impact result | `impact_` | Used for persisted change-impact records and summaries. |
-| evidence pack | `evidence_pack_` | Used to reopen evidence and source spans. |
-| report payload | `report_` | Used for rendered reports before export. |
-| export bundle | `export_` | Used for exported snapshots and bundles. |
+| query lookups | none | Query tools use the in-process registry and file paths instead of new stable IDs. |
 
 ## Storage Ownership
 
@@ -147,12 +77,7 @@ Every runtime directory is owned by one domain under `<target_repo>/.codewiki/`:
 | --- | --- | --- |
 | `scan` | `scan` | scan metadata and scan handles |
 | `scope` | `scope` | scope snapshots derived from scans |
-| `anchors` | `anchors` | anchor extraction outputs |
-| `slice` | `slice` | slice manifests and expansions |
-| `evidence` | `evidence` | evidence packs and citations |
-| `impact` | `impact` | impact analysis artifacts |
-| `report` | `report` | report payloads before export |
-| `export` | `export` | exported analysis bundles |
+| `anchors` | `anchors` | anchor extraction outputs and call relations |
 
 ## MCP Response Envelope
 

@@ -5,13 +5,12 @@ from pathlib import Path
 from repo_analysis_tools.core.errors import ErrorCode
 from repo_analysis_tools.core.ids import StableIdKind
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
-from repo_analysis_tools.storage.contracts import STORAGE_BOUNDARIES
 
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ARCHITECTURE_DOC = REPO_ROOT / "docs" / "architecture.md"
 CONTRACT_DOC = REPO_ROOT / "docs" / "contracts" / "mcp-tool-contracts.md"
-ANALYSIS_MAINTENANCE_SKILL = REPO_ROOT / ".agents" / "skills" / "analysis-maintenance" / "SKILL.md"
+REPO_UNDERSTAND_SKILL = REPO_ROOT / ".agents" / "skills" / "repo-understand" / "SKILL.md"
 
 EXPECTED_ARCHITECTURE_BOUNDARIES = {
     "core",
@@ -19,25 +18,10 @@ EXPECTED_ARCHITECTURE_BOUNDARIES = {
     "scan",
     "scope",
     "anchors",
-    "slice",
-    "evidence",
-    "impact",
-    "report",
-    "export",
+    "query",
     "mcp",
     "skills",
-    "doc_specs",
-    "doc_dsl",
-    "renderers",
     "tests",
-}
-
-EXPECTED_ID_LABELS = {
-    StableIdKind.SCAN: "scan_",
-    StableIdKind.SLICE: "slice_",
-    StableIdKind.EVIDENCE_PACK: "evidence_pack_",
-    StableIdKind.REPORT: "report_",
-    StableIdKind.EXPORT: "export_",
 }
 
 
@@ -84,24 +68,62 @@ class ArchitectureDocsTest(unittest.TestCase):
             return []
         return re.findall(r"`([^`]+)`", cell)
 
-    def test_architecture_doc_records_m1_boundaries_runtime_and_errors(self) -> None:
+    def test_architecture_doc_records_query_first_surface(self) -> None:
         document = self.read_text(ARCHITECTURE_DOC)
 
-        self.assertIn("<target_repo>/.codewiki/", document)
+        self.assertIn("query-first MCP surface", document)
         self.assertIn("recommended_next_tools", document)
+        self.assertIn("process-local `scan_id -> repo_root` registry", document)
+        self.assertIn("<target_repo>/.codewiki/scan/", document)
+        self.assertIn("<target_repo>/.codewiki/scope/", document)
+        self.assertIn("<target_repo>/.codewiki/anchors/", document)
 
         for boundary in EXPECTED_ARCHITECTURE_BOUNDARIES:
             self.assertIn(f"`{boundary}`", document, boundary)
 
-        for storage_boundary in STORAGE_BOUNDARIES.values():
-            self.assertIn(f"`{storage_boundary.domain}`", document, storage_boundary.domain)
-            self.assertIn(f"`{storage_boundary.directory_name}`", document, storage_boundary.domain)
-
         for error_code in ErrorCode:
             self.assertIn(f"`{error_code.value}`", document, error_code.value)
 
-        for id_prefix in EXPECTED_ID_LABELS.values():
-            self.assertIn(f"`{id_prefix}`", document, id_prefix)
+        for tool_name in (
+            "rebuild_repo_snapshot",
+            "list_priority_files",
+            "get_file_info",
+            "list_file_symbols",
+            "resolve_symbols",
+            "open_symbol_context",
+            "query_call_relations",
+            "find_root_functions",
+            "find_call_paths",
+        ):
+            self.assertIn(f"`{tool_name}`", document, tool_name)
+
+        for tool_name in (
+            "scan_repo",
+            "refresh_scan",
+            "get_scan_status",
+            "show_scope",
+            "list_scope_nodes",
+            "explain_scope_node",
+            "list_anchors",
+            "find_anchor",
+            "describe_anchor",
+            "plan_slice",
+            "expand_slice",
+            "inspect_slice",
+            "build_evidence_pack",
+            "read_evidence_pack",
+            "open_span",
+            "impact_from_paths",
+            "impact_from_anchor",
+            "summarize_impact",
+            "render_focus_report",
+            "render_module_summary",
+            "render_analysis_outline",
+            "export_analysis_bundle",
+            "export_scope_snapshot",
+            "export_evidence_bundle",
+        ):
+            self.assertNotIn(tool_name, document)
 
     def test_contract_doc_lists_every_domain_tool_and_standard_envelope(self) -> None:
         document = self.read_text(CONTRACT_DOC)
@@ -170,28 +192,11 @@ class ArchitectureDocsTest(unittest.TestCase):
         }:
             self.assertIn(f"`{id_kind.value}`", document, id_kind.value)
 
-    def test_architecture_doc_records_export_layout_and_maintenance_skill(self) -> None:
-        document = self.read_text(ARCHITECTURE_DOC)
-        skill = self.read_text(ANALYSIS_MAINTENANCE_SKILL)
+    def test_repo_understand_skill_is_written_for_the_query_first_surface(self) -> None:
+        skill = self.read_text(REPO_UNDERSTAND_SKILL)
 
-        export_section = self.section_text(document, "M5 Export Handoff")
-
-        self.assertIn(".codewiki/export/", export_section)
-        self.assertIn("results/export_<12-hex>.json", export_section)
-        self.assertIn("bundles/export_<12-hex>/manifest.json", export_section)
-        self.assertIn("bundles/export_<12-hex>/payload.json", export_section)
-        self.assertIn("bundles/export_<12-hex>/report.md", export_section)
-        self.assertIn("source_kind", export_section)
-        self.assertIn("source_id", export_section)
-        self.assertIn("owner_tool", export_section)
-        self.assertIn("freshness", export_section)
-        self.assertIn("copied_paths", export_section)
-        self.assertIn("analysis-maintenance", document)
-        self.assertIn("get_scan_status / refresh_scan", skill)
-        self.assertIn("export_scope_snapshot / export_evidence_bundle / export_analysis_bundle", skill)
-        self.assertIn("inspect manifest freshness", skill)
-        self.assertIn("freshness.state", skill)
-
-        self.assertIn("export_scope_snapshot", skill)
-        self.assertIn("export_evidence_bundle", skill)
-        self.assertIn("export_analysis_bundle", skill)
+        self.assertIn("query-first MCP surface", skill)
+        self.assertIn("rebuild_repo_snapshot", skill)
+        self.assertIn("find_call_paths", skill)
+        self.assertNotIn("scan_repo", skill)
+        self.assertNotIn("build_evidence_pack", skill)

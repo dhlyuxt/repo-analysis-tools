@@ -127,3 +127,33 @@ class QueryServiceTest(unittest.TestCase):
             self.assertEqual(paths.status, "found")
             self.assertFalse(paths.truncated)
             self.assertEqual(paths.returned_path_count, 8)
+
+    def test_query_call_relations_rejects_non_function_symbol_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            file_symbols = service.list_file_symbols(repo, scan_snapshot.scan_id, ["include/types.h"])
+            non_function_symbol = file_symbols[0].symbols[0]
+
+            with self.assertRaisesRegex(ValueError, "must reference a function"):
+                service.query_call_relations(repo, scan_snapshot.scan_id, non_function_symbol.symbol_id)
+
+    def test_find_call_paths_rejects_non_function_symbol_id(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            file_symbols = service.list_file_symbols(repo, scan_snapshot.scan_id, ["include/types.h"])
+            non_function_symbol = file_symbols[0].symbols[0]
+            src_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "main").matches[0].symbol_id
+
+            with self.assertRaisesRegex(ValueError, "must reference a function"):
+                service.find_call_paths(
+                    repo,
+                    scan_snapshot.scan_id,
+                    non_function_symbol.symbol_id,
+                    src_id,
+                )

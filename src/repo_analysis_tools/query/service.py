@@ -266,6 +266,8 @@ class QueryService:
 
     def _function_anchor_for_id(self, anchors: list[AnchorRecord], symbol_id: str) -> AnchorRecord:
         anchor = self._find_anchor(anchors, symbol_id)
+        if anchor.kind not in {"function_definition", "function_declaration"}:
+            raise ValueError(f"symbol {symbol_id} must reference a function definition or declaration")
         return self._preferred_definition_anchor(anchors, anchor)
 
     def _find_scoped_file(self, scoped_files: list[ScopedFile], path: str) -> ScopedFile:

@@ -12,6 +12,18 @@ from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 class ScanServiceTest(unittest.TestCase):
+    def test_scan_service_builds_anchor_snapshot_before_scope_snapshot(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            result = ScanService().scan(repo)
+            scope_snapshot = ScopeStore.for_repo(repo).load(result.scan_id)
+            by_path = {scoped_file.path: scoped_file for scoped_file in scope_snapshot.files}
+
+            self.assertEqual(by_path["src/flash.c"].incoming_call_count, 2)
+            self.assertEqual(by_path["src/flash.c"].root_function_count, 0)
+            self.assertEqual(by_path["src/config.h"].macro_count, 1)
+
     def test_scan_service_persists_latest_scan_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))

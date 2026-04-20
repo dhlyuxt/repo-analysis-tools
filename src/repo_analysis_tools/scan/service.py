@@ -41,6 +41,6 @@ class ScanService:
             files=files,
         )
         ScanStore.for_repo(repo).save(snapshot)
-        ScopeService().build_snapshot(repo, snapshot.scan_id)
         AnchorService().build_snapshot(repo, snapshot.scan_id)
+        ScopeService().build_snapshot(repo, snapshot.scan_id)
         return snapshot

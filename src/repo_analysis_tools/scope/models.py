@@ -4,17 +4,66 @@ from dataclasses import dataclass
 from typing import Any
 
 
+ROLE_WEIGHT = {
+    "primary": 40,
+    "support": 20,
+    "external": 5,
+    "generated": 0,
+}
+
+
+def compute_priority_score(
+    *,
+    role: str,
+    has_main_definition: bool,
+    root_function_count: int,
+    function_count: int,
+    incoming_call_count: int,
+    outgoing_call_count: int,
+) -> int:
+    score = ROLE_WEIGHT[role]
+    if has_main_definition:
+        score += 50
+    score += min(root_function_count * 15, 30)
+    score += min(function_count * 2, 20)
+    score += min(incoming_call_count, 20)
+    score += min(outgoing_call_count, 20)
+    return score
+
+
 @dataclass(frozen=True)
 class ScopedFile:
     path: str
     role: str
     node_id: str
+    priority_score: int
+    line_count: int
+    symbol_count: int
+    function_count: int
+    type_count: int
+    macro_count: int
+    include_count: int
+    incoming_call_count: int
+    outgoing_call_count: int
+    root_function_count: int
+    has_main_definition: bool
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "path": self.path,
             "role": self.role,
             "node_id": self.node_id,
+            "priority_score": self.priority_score,
+            "line_count": self.line_count,
+            "symbol_count": self.symbol_count,
+            "function_count": self.function_count,
+            "type_count": self.type_count,
+            "macro_count": self.macro_count,
+            "include_count": self.include_count,
+            "incoming_call_count": self.incoming_call_count,
+            "outgoing_call_count": self.outgoing_call_count,
+            "root_function_count": self.root_function_count,
+            "has_main_definition": self.has_main_definition,
         }
 
     @classmethod
@@ -23,6 +72,17 @@ class ScopedFile:
             path=str(payload["path"]),
             role=str(payload["role"]),
             node_id=str(payload["node_id"]),
+            priority_score=int(payload["priority_score"]),
+            line_count=int(payload["line_count"]),
+            symbol_count=int(payload["symbol_count"]),
+            function_count=int(payload["function_count"]),
+            type_count=int(payload["type_count"]),
+            macro_count=int(payload["macro_count"]),
+            include_count=int(payload["include_count"]),
+            incoming_call_count=int(payload["incoming_call_count"]),
+            outgoing_call_count=int(payload["outgoing_call_count"]),
+            root_function_count=int(payload["root_function_count"]),
+            has_main_definition=bool(payload["has_main_definition"]),
         )
 
 

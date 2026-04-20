@@ -31,6 +31,32 @@ def build_scope_edge_case_repo(tmp_path: Path) -> Path:
 
 
 class ScopeServiceTest(unittest.TestCase):
+    def test_build_snapshot_persists_enriched_file_facts(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = ScopeService().build_snapshot(repo, scan_snapshot.scan_id)
+            by_path = {scoped_file.path: scoped_file for scoped_file in snapshot.files}
+
+            self.assertEqual(by_path["src/main.c"].role, "primary")
+            self.assertTrue(by_path["src/main.c"].has_main_definition)
+            self.assertEqual(by_path["src/main.c"].line_count, 3)
+            self.assertEqual(by_path["src/main.c"].symbol_count, 2)
+            self.assertEqual(by_path["src/main.c"].function_count, 2)
+            self.assertEqual(by_path["src/main.c"].include_count, 1)
+            self.assertEqual(by_path["src/main.c"].incoming_call_count, 0)
+            self.assertEqual(by_path["src/main.c"].outgoing_call_count, 1)
+            self.assertEqual(by_path["src/main.c"].root_function_count, 1)
+            self.assertEqual(by_path["src/main.c"].priority_score, 110)
+            self.assertEqual(by_path["src/flash.c"].priority_score, 44)
+            self.assertEqual(by_path["demo/demo_main.c"].priority_score, 25)
+            self.assertGreater(by_path["src/main.c"].priority_score, by_path["src/flash.c"].priority_score)
+            self.assertGreater(by_path["src/flash.c"].priority_score, by_path["demo/demo_main.c"].priority_score)
+            self.assertEqual(by_path["src/flash.c"].incoming_call_count, 2)
+            self.assertEqual(by_path["src/flash.c"].root_function_count, 0)
+            self.assertEqual(by_path["src/config.h"].macro_count, 1)
+
     def test_build_snapshot_classifies_expected_roles_and_persists_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))

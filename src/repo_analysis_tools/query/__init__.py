@@ -1,8 +1,14 @@
 """Query service package for file and symbol lookups."""
 
 from .models import (
+    CallPathRow,
+    CallRelationResult,
+    CallRelationRow,
     FileInfoRow,
     FileSymbolsRow,
+    NonResolvedCallRow,
+    PathNodeRow,
+    PathSearchResult,
     PriorityFileRow,
     SymbolContextRow,
     SymbolMatchResult,
@@ -11,8 +17,14 @@ from .models import (
 from .service import QueryService
 
 __all__ = [
+    "CallPathRow",
+    "CallRelationResult",
+    "CallRelationRow",
     "FileInfoRow",
     "FileSymbolsRow",
+    "NonResolvedCallRow",
+    "PathNodeRow",
+    "PathSearchResult",
     "PriorityFileRow",
     "QueryService",
     "SymbolContextRow",

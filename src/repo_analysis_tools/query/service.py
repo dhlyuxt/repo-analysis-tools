@@ -1,11 +1,18 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from pathlib import Path, PurePosixPath
 import re
 
 from repo_analysis_tools.anchors.models import AnchorRecord
 from repo_analysis_tools.anchors.store import AnchorStore
 from repo_analysis_tools.query.models import (
+    CallPathRow,
+    CallRelationResult,
+    CallRelationRow,
+    NonResolvedCallRow,
+    PathNodeRow,
+    PathSearchResult,
     FileInfoRow,
     FileSymbolsRow,
     PriorityFileRow,
@@ -13,6 +20,7 @@ from repo_analysis_tools.query.models import (
     SymbolMatchResult,
     SymbolRow,
 )
+from repo_analysis_tools.query.path_search import enumerate_simple_paths
 from repo_analysis_tools.scope.models import ScopedFile
 from repo_analysis_tools.scope.store import ScopeStore
 
@@ -21,6 +29,8 @@ _STORAGE_RE = re.compile(r"\b(static|extern)\b")
 
 
 class QueryService:
+    _PATH_SEARCH_LIMIT = 8
+
     def list_priority_files(self, target_repo: Path | str, scan_id: str) -> tuple[PriorityFileRow, ...]:
         scope_snapshot = self._load_scope_snapshot(target_repo, scan_id)
         rows = [
@@ -31,6 +41,155 @@ class QueryService:
             )
         ]
         return tuple(rows)
+
+    def query_call_relations(
+        self,
+        target_repo: Path | str,
+        scan_id: str,
+        function_id: str,
+    ) -> CallRelationResult:
+        anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
+        anchor = self._function_anchor_for_id(anchor_snapshot.anchors, function_id)
+        anchor_by_id = {item.anchor_id: item for item in anchor_snapshot.anchors}
+        callers_by_id: dict[str, list[int]] = defaultdict(list)
+        callees_by_id: dict[str, list[int]] = defaultdict(list)
+        unresolved_by_name: dict[str, list[int]] = defaultdict(list)
+
+        for relation in anchor_snapshot.relations:
+            if relation.kind != "direct_call":
+                continue
+            if relation.target_anchor_id == anchor.anchor_id:
+                callers_by_id[relation.source_anchor_id].append(relation.line or 0)
+            if relation.source_anchor_id == anchor.anchor_id and relation.target_anchor_id is not None:
+                callees_by_id[relation.target_anchor_id].append(relation.line or 0)
+            if relation.source_anchor_id == anchor.anchor_id and relation.target_anchor_id is None:
+                unresolved_by_name[relation.target_name].append(relation.line or 0)
+
+        callers = tuple(
+            sorted(
+                (
+                    CallRelationRow(
+                        symbol_id=caller.anchor_id,
+                        name=caller.name,
+                        path=caller.path,
+                        call_lines=tuple(sorted(set(lines))),
+                    )
+                    for caller_id, lines in callers_by_id.items()
+                    if (caller := anchor_by_id.get(caller_id)) is not None
+                ),
+                key=lambda item: (item.path, item.name, item.symbol_id),
+            )
+        )
+        callees = tuple(
+            sorted(
+                (
+                    CallRelationRow(
+                        symbol_id=callee.anchor_id,
+                        name=callee.name,
+                        path=callee.path,
+                        call_lines=tuple(sorted(set(lines))),
+                    )
+                    for callee_id, lines in callees_by_id.items()
+                    if (callee := anchor_by_id.get(callee_id)) is not None
+                ),
+                key=lambda item: (item.path, item.name, item.symbol_id),
+            )
+        )
+        non_resolved_callees = tuple(
+            sorted(
+                (
+                    NonResolvedCallRow(
+                        name=name,
+                        status="unresolved",
+                        call_lines=tuple(sorted(set(lines))),
+                    )
+                    for name, lines in unresolved_by_name.items()
+                ),
+                key=lambda item: (item.name, item.status, item.call_lines),
+            )
+        )
+        return CallRelationResult(
+            callers=callers,
+            callees=callees,
+            non_resolved_callees=non_resolved_callees,
+        )
+
+    def find_root_functions(
+        self,
+        target_repo: Path | str,
+        scan_id: str,
+        paths: list[str],
+    ) -> tuple[SymbolRow, ...]:
+        anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
+        selected_paths = {self._normalize_repo_path(path) for path in paths}
+        incoming_call_counts: dict[str, int] = defaultdict(int)
+        for relation in anchor_snapshot.relations:
+            if relation.kind != "direct_call" or relation.target_anchor_id is None:
+                continue
+            incoming_call_counts[relation.target_anchor_id] += 1
+
+        roots = [
+            self._symbol_row_from_anchor(anchor, target_repo)
+            for anchor in anchor_snapshot.anchors
+            if anchor.kind == "function_definition"
+            and anchor.path in selected_paths
+            and incoming_call_counts.get(anchor.anchor_id, 0) == 0
+        ]
+        return tuple(sorted(roots, key=lambda item: (item.path, item.line_start, item.name, item.symbol_id)))
+
+    def find_call_paths(
+        self,
+        target_repo: Path | str,
+        scan_id: str,
+        from_function_id: str,
+        to_function_id: str,
+    ) -> PathSearchResult:
+        anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
+        from_anchor = self._function_anchor_for_id(anchor_snapshot.anchors, from_function_id)
+        to_anchor = self._function_anchor_for_id(anchor_snapshot.anchors, to_function_id)
+        anchor_by_id = {anchor.anchor_id: anchor for anchor in anchor_snapshot.anchors}
+        adjacency = self._call_adjacency(anchor_snapshot.relations)
+        raw_paths, truncated = enumerate_simple_paths(
+            adjacency,
+            from_anchor.anchor_id,
+            to_anchor.anchor_id,
+            limit=self._PATH_SEARCH_LIMIT,
+        )
+
+        path_rows = []
+        for raw_path in raw_paths:
+            nodes = []
+            call_lines = []
+            for index, (symbol_id, line) in enumerate(raw_path):
+                anchor = anchor_by_id[symbol_id]
+                nodes.append(PathNodeRow(symbol_id=anchor.anchor_id, name=anchor.name, path=anchor.path))
+                if index > 0 and line is not None:
+                    call_lines.append(line)
+            path_rows.append(
+                CallPathRow(
+                    hop_count=max(len(nodes) - 1, 0),
+                    nodes=tuple(nodes),
+                    call_lines=tuple(call_lines),
+                )
+            )
+
+        ordered_paths = tuple(
+            sorted(
+                path_rows,
+                key=lambda item: (
+                    item.hop_count,
+                    tuple(node.name for node in item.nodes),
+                    tuple(node.symbol_id for node in item.nodes),
+                ),
+            )
+        )
+        status = "truncated" if truncated else ("found" if ordered_paths else "no_path")
+        return PathSearchResult(
+            status=status,
+            returned_path_count=len(ordered_paths),
+            truncated=truncated,
+            paths=ordered_paths,
+        )
 
     def get_file_info(self, target_repo: Path | str, scan_id: str, path: str) -> FileInfoRow:
         scope_snapshot = self._load_scope_snapshot(target_repo, scan_id)
@@ -104,6 +263,10 @@ class QueryService:
 
     def _load_anchor_snapshot(self, target_repo: Path | str, scan_id: str):
         return AnchorStore.for_repo(target_repo).load(scan_id)
+
+    def _function_anchor_for_id(self, anchors: list[AnchorRecord], symbol_id: str) -> AnchorRecord:
+        anchor = self._find_anchor(anchors, symbol_id)
+        return self._preferred_definition_anchor(anchors, anchor)
 
     def _find_scoped_file(self, scoped_files: list[ScopedFile], path: str) -> ScopedFile:
         normalized_path = self._normalize_repo_path(path)
@@ -188,6 +351,16 @@ class QueryService:
         if len(definitions) == 1:
             return definitions[0]
         return anchor
+
+    def _call_adjacency(self, relations: list) -> dict[str, list[tuple[str, int]]]:
+        adjacency: dict[str, list[tuple[str, int]]] = defaultdict(list)
+        for relation in relations:
+            if relation.kind != "direct_call" or relation.target_anchor_id is None:
+                continue
+            adjacency[relation.source_anchor_id].append((relation.target_anchor_id, relation.line or 0))
+        for edges in adjacency.values():
+            edges.sort(key=lambda item: (item[1], item[0]))
+        return dict(adjacency)
 
     def _definition_end_line(self, anchor: AnchorRecord, source_lines: list[str]) -> int:
         if anchor.kind != "function_definition":

@@ -61,3 +61,47 @@ class SymbolContextRow:
     context_line_start: int
     context_line_end: int
     lines: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class CallRelationRow:
+    symbol_id: str
+    name: str
+    path: str
+    call_lines: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class NonResolvedCallRow:
+    name: str
+    status: str
+    call_lines: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class CallRelationResult:
+    callers: tuple[CallRelationRow, ...]
+    callees: tuple[CallRelationRow, ...]
+    non_resolved_callees: tuple[NonResolvedCallRow, ...]
+
+
+@dataclass(frozen=True)
+class PathNodeRow:
+    symbol_id: str
+    name: str
+    path: str
+
+
+@dataclass(frozen=True)
+class CallPathRow:
+    hop_count: int
+    nodes: tuple[PathNodeRow, ...]
+    call_lines: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class PathSearchResult:
+    status: str
+    returned_path_count: int
+    truncated: bool
+    paths: tuple[CallPathRow, ...]

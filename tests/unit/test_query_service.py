@@ -5,6 +5,7 @@ from pathlib import Path
 from repo_analysis_tools.query.service import QueryService
 from repo_analysis_tools.scan.service import ScanService
 from tests.fixtures.query_repo import build_query_repo
+from tests.fixtures.query_path_repo import build_query_path_repo
 
 
 class QueryServiceTest(unittest.TestCase):
@@ -87,3 +88,27 @@ class QueryServiceTest(unittest.TestCase):
             self.assertEqual(symbol_context.definition_line_end, 5)
             self.assertEqual(symbol_context.lines[-1], "}")
             self.assertIn('const char *s = "}";', symbol_context.lines[1])
+
+    def test_graph_queries_return_direct_relations_roots_and_bounded_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_path_repo(Path(tmpdir), branch_count=10)
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            src_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "src").matches[0].symbol_id
+            dst_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "dst").matches[0].symbol_id
+
+            relations = service.query_call_relations(repo, scan_snapshot.scan_id, dst_id)
+            roots = service.find_root_functions(repo, scan_snapshot.scan_id, ["src/graph.c"])
+            paths = service.find_call_paths(repo, scan_snapshot.scan_id, src_id, dst_id)
+
+            self.assertEqual({row.name for row in relations.callers}, {f"mid_{i}" for i in range(10)})
+            self.assertEqual({row.name for row in relations.callees}, {"helper"})
+            self.assertEqual({row.name for row in relations.non_resolved_callees}, {"external_api"})
+            self.assertEqual({row.name for row in roots}, {"src"})
+            self.assertEqual(paths.status, "truncated")
+            self.assertEqual(paths.returned_path_count, 8)
+            self.assertTrue(paths.truncated)
+            self.assertEqual(paths.paths[0].hop_count, 2)
+            self.assertEqual(paths.paths[0].nodes[0].name, "src")
+            self.assertEqual(paths.paths[0].nodes[-1].name, "dst")

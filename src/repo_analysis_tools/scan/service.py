@@ -23,14 +23,13 @@ class ScanService:
             relative_path = normalize_repo_relative_path(repo, candidate)
             if relative_path.startswith(".git/") or relative_path.startswith(".codewiki/"):
                 continue
+            content = candidate.read_bytes()
             files.append(
                 ScannedFile(
                     path=relative_path,
-                    content_sha256=hashlib.sha256(candidate.read_bytes()).hexdigest(),
+                    content_sha256=hashlib.sha256(content).hexdigest(),
                     size_bytes=candidate.stat().st_size,
-                    line_count=len(
-                        candidate.read_text(encoding="utf-8", errors="ignore").splitlines()
-                    ),
+                    line_count=len(content.splitlines()),
                 )
             )
         git_head, workspace_dirty = detect_git_provenance(repo)

@@ -1,18 +1,33 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from repo_analysis_tools.anchors.store import AnchorStore
+from repo_analysis_tools.anchors.service import AnchorService
 from repo_analysis_tools.core.errors import ErrorCode
 from repo_analysis_tools.mcp.tools.scan_tools import get_scan_status, refresh_scan, scan_repo
 from repo_analysis_tools.scan.service import ScanService
 from repo_analysis_tools.scan.store import ScanStore
 from repo_analysis_tools.scope.store import ScopeStore
+from repo_analysis_tools.scope.service import ScopeService
 from tests.fixtures.git_helpers import init_git_fixture
 from tests.fixtures.scope_first_repo import build_scope_first_repo
 
 
 class ScanServiceTest(unittest.TestCase):
+    def test_scan_service_counts_lines_without_text_decoding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_scope_first_repo(Path(tmpdir))
+
+            with mock.patch.object(AnchorService, "build_snapshot", return_value=None), mock.patch.object(
+                ScopeService, "build_snapshot", return_value=None
+            ), mock.patch.object(Path, "read_text", side_effect=AssertionError("read_text should not be used")):
+                snapshot = ScanService().scan(repo)
+
+            by_path = {scanned_file.path: scanned_file for scanned_file in snapshot.files}
+            self.assertEqual(by_path["src/main.c"].line_count, 3)
+
     def test_scan_service_builds_anchor_snapshot_before_scope_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
@@ -24,6 +39,36 @@ class ScanServiceTest(unittest.TestCase):
             self.assertEqual(by_path["src/flash.c"].incoming_call_count, 2)
             self.assertEqual(by_path["src/flash.c"].root_function_count, 0)
             self.assertEqual(by_path["src/config.h"].macro_count, 1)
+
+    def test_scan_store_loads_old_format_scan_snapshot_without_line_count(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir) / "scan-old-format-repo"
+            store = ScanStore.for_repo(repo)
+            scan_id = "scan_123456abcdef"
+            store.assets.write_json(
+                f"snapshots/{scan_id}.json",
+                {
+                    "scan_id": scan_id,
+                    "repo_root": str(repo),
+                    "file_count": 1,
+                    "completed_at": "2026-04-20T00:00:00+00:00",
+                    "git_head": None,
+                    "workspace_dirty": None,
+                    "files": [
+                        {
+                            "path": "src/main.c",
+                            "content_sha256": "deadbeef",
+                            "size_bytes": 3,
+                        }
+                    ],
+                },
+            )
+            store.assets.write_json("latest.json", {"scan_id": scan_id})
+
+            loaded = store.load()
+
+            self.assertEqual(loaded.files[0].path, "src/main.c")
+            self.assertEqual(loaded.files[0].line_count, 0)
 
     def test_scan_service_persists_latest_scan_summary(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

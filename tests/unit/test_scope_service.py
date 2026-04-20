@@ -72,6 +72,46 @@ class ScopeServiceTest(unittest.TestCase):
             self.assertEqual(stored_by_path["src/flash.c"].root_function_count, 0)
             self.assertEqual(stored_by_path["src/config.h"].macro_count, 1)
 
+    def test_scope_store_loads_old_format_scope_snapshot_without_enriched_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir) / "scope-old-format-repo"
+            store = ScopeStore.for_repo(repo)
+            scan_id = "scan_abcdef123456"
+            store.assets.write_json(
+                f"snapshots/{scan_id}.json",
+                {
+                    "scan_id": scan_id,
+                    "repo_root": str(repo),
+                    "scope_summary": "1 scope node covers 1 files across primary roles.",
+                    "role_counts": {"primary": 1},
+                    "nodes": [
+                        {
+                            "node_id": "scope_src",
+                            "label": "src",
+                            "role": "primary",
+                            "file_count": 1,
+                            "related_files": ["src/main.c"],
+                        }
+                    ],
+                    "files": [
+                        {
+                            "path": "src/main.c",
+                            "role": "primary",
+                            "node_id": "scope_src",
+                        }
+                    ],
+                },
+            )
+            store.assets.write_json("latest.json", {"scan_id": scan_id})
+
+            loaded = store.load()
+
+            self.assertEqual(loaded.files[0].path, "src/main.c")
+            self.assertEqual(loaded.files[0].priority_score, 0)
+            self.assertEqual(loaded.files[0].line_count, 0)
+            self.assertEqual(loaded.files[0].symbol_count, 0)
+            self.assertFalse(loaded.files[0].has_main_definition)
+
     def test_build_snapshot_classifies_expected_roles_and_persists_snapshot(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))

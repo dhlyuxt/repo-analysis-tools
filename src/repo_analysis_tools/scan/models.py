@@ -25,7 +25,7 @@ class ScannedFile:
             path=str(payload["path"]),
             content_sha256=str(payload["content_sha256"]),
             size_bytes=int(payload["size_bytes"]),
-            line_count=int(payload["line_count"]),
+            line_count=int(payload.get("line_count", 0)),
         )
 
 

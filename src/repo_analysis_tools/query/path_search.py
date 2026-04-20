@@ -12,12 +12,16 @@ def enumerate_simple_paths(
 ) -> tuple[list[list[tuple[str, int | None]]], bool]:
     queue: deque[list[tuple[str, int | None]]] = deque([[(start, None)]])
     found: list[list[tuple[str, int | None]]] = []
+    overflow_found = False
 
-    while queue and len(found) < limit:
+    while queue and not overflow_found:
         path = queue.popleft()
         node = path[-1][0]
         if node == goal:
-            found.append(path)
+            if len(found) < limit:
+                found.append(path)
+            else:
+                overflow_found = True
             continue
 
         visited = {item[0] for item in path}
@@ -26,4 +30,4 @@ def enumerate_simple_paths(
                 continue
             queue.append(path + [(next_node, line)])
 
-    return found, bool(queue)
+    return found, overflow_found

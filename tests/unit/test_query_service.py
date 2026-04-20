@@ -112,3 +112,18 @@ class QueryServiceTest(unittest.TestCase):
             self.assertEqual(paths.paths[0].hop_count, 2)
             self.assertEqual(paths.paths[0].nodes[0].name, "src")
             self.assertEqual(paths.paths[0].nodes[-1].name, "dst")
+
+    def test_find_call_paths_does_not_truncate_when_only_dead_end_paths_remain(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_path_repo(Path(tmpdir), branch_count=8, include_dead_end=True)
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            src_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "src").matches[0].symbol_id
+            dst_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "dst").matches[0].symbol_id
+
+            paths = service.find_call_paths(repo, scan_snapshot.scan_id, src_id, dst_id)
+
+            self.assertEqual(paths.status, "found")
+            self.assertFalse(paths.truncated)
+            self.assertEqual(paths.returned_path_count, 8)

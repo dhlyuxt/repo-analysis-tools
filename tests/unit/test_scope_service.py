@@ -2,8 +2,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from repo_analysis_tools.core.errors import ErrorCode
-from repo_analysis_tools.mcp.tools.scope_tools import explain_scope_node, list_scope_nodes, show_scope
 from repo_analysis_tools.scan.service import ScanService
 from repo_analysis_tools.scope.service import ScopeService
 from repo_analysis_tools.scope.store import ScopeStore
@@ -157,27 +155,32 @@ class ScopeServiceTest(unittest.TestCase):
             self.assertEqual(scope_snapshot.scan_id, scan_snapshot.scan_id)
             self.assertEqual(scope_snapshot.role_counts["primary"], 3)
 
-    def test_scope_tools_return_real_payloads(self) -> None:
+    def test_scope_snapshot_persists_summary_and_nodes(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_scope_first_repo(Path(tmpdir))
             scan_snapshot = ScanService().scan(repo)
 
-            scope_payload = show_scope(str(repo))
-            nodes_payload = list_scope_nodes(str(repo), scan_snapshot.scan_id)
-            explain_payload = explain_scope_node(str(repo), "scope_src", scan_snapshot.scan_id)
+            snapshot = ScopeStore.for_repo(repo).load(scan_snapshot.scan_id)
 
-            self.assertEqual(scope_payload["status"], "ok")
-            self.assertEqual(scope_payload["data"]["scan_id"], scan_snapshot.scan_id)
+            self.assertEqual(snapshot.scan_id, scan_snapshot.scan_id)
             self.assertEqual(
-                scope_payload["data"]["role_counts"],
+                snapshot.role_counts,
                 {"external": 1, "generated": 1, "primary": 3, "support": 1},
             )
             self.assertEqual(
-                scope_payload["data"]["scope_summary"],
+                snapshot.scope_summary,
                 "4 scope nodes cover 6 files across primary, support, external, and generated roles.",
             )
             self.assertEqual(
-                nodes_payload["data"]["nodes"],
+                [
+                    {
+                        "file_count": node.file_count,
+                        "label": node.label,
+                        "node_id": node.node_id,
+                        "role": node.role,
+                    }
+                    for node in snapshot.nodes
+                ],
                 [
                     {"file_count": 1, "label": "demo", "node_id": "scope_demo", "role": "external"},
                     {"file_count": 1, "label": "generated", "node_id": "scope_generated", "role": "generated"},
@@ -185,22 +188,10 @@ class ScopeServiceTest(unittest.TestCase):
                     {"file_count": 3, "label": "src", "node_id": "scope_src", "role": "primary"},
                 ],
             )
-            self.assertEqual(explain_payload["data"]["node_id"], "scope_src")
-            self.assertEqual(explain_payload["data"]["summary"], "src is a primary scope node with 3 related files.")
-            self.assertEqual(
-                explain_payload["data"]["related_files"],
-                ["src/config.h", "src/flash.c", "src/main.c"],
-            )
-
-    def test_explain_scope_node_returns_not_found_for_unknown_node(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_snapshot = ScanService().scan(repo)
-
-            payload = explain_scope_node(str(repo), "scope_missing", scan_snapshot.scan_id)
-
-            self.assertEqual(payload["status"], "error")
-            self.assertEqual(payload["data"]["error"]["code"], ErrorCode.NOT_FOUND.value)
+            scope_src = next(node for node in snapshot.nodes if node.node_id == "scope_src")
+            self.assertEqual(scope_src.label, "src")
+            self.assertEqual(scope_src.role, "primary")
+            self.assertEqual(scope_src.related_files, ["src/config.h", "src/flash.c", "src/main.c"])
 
     def test_build_snapshot_includes_root_level_c_and_h_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

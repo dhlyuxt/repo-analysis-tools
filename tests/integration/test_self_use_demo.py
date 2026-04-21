@@ -84,6 +84,7 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
             context_payload = open_symbol_context(scan_id, symbol_row["symbol_id"], 2)
             relations_payload = query_call_relations(scan_id, symbol_row["symbol_id"])
             roots_payload = find_root_functions(scan_id, ["easyflash/src/easyflash.c", "easyflash/port/ef_port.c"])
+            path_payload = None
             self.assertGreaterEqual(len(relations_payload["data"]["callees"]), 0)
             self.assertGreaterEqual(len(roots_payload["data"]["roots"]), 0)
             self.assertGreaterEqual(context_payload["data"]["context_line_end"], context_payload["data"]["context_line_start"])
@@ -95,5 +96,7 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
                     symbol_row["symbol_id"],
                 )
                 self.assertIn(path_payload["data"]["status"], {"found", "no_path", "truncated"})
-            self.assertIn("returned_path_count", path_payload["data"])
+                self.assertIn("returned_path_count", path_payload["data"])
+            else:
+                self.assertIsNone(path_payload)
             self.assertEqual(context_payload["data"]["symbol_id"], symbol_row["symbol_id"])

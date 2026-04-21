@@ -43,7 +43,7 @@ The repository currently exposes one MCP server with a nine-tool active surface.
 
 ## Current Skills
 
-The repository currently mirrors four skill packages across [`.agents/skills`](./.agents/skills) and [`.claude/skills`](./.claude/skills). Only `repo-understand` is the active workflow skill for repository understanding; the other three mirrored packages are supporting analysis skills.
+The repository currently mirrors one workflow skill across [`.agents/skills`](./.agents/skills) and [`.claude/skills`](./.claude/skills): `repo-understand`.
 
 ### `repo-understand`
 

@@ -6,9 +6,6 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 SKILL_NAMES = [
-    "analysis-maintenance",
-    "analysis-writing",
-    "change-impact",
     "repo-understand",
 ]
 
@@ -22,8 +19,14 @@ class ClientSkillDistributionTest(unittest.TestCase):
         agents_root = ROOT / ".agents" / "skills"
         claude_root = ROOT / ".claude" / "skills"
 
-        self.assertEqual(sorted(child.name for child in agents_root.iterdir() if child.is_dir()), sorted(SKILL_NAMES))
-        self.assertEqual(sorted(child.name for child in claude_root.iterdir() if child.is_dir()), sorted(SKILL_NAMES))
+        self.assertEqual(
+            sorted(path.parent.name for path in agents_root.glob("*/SKILL.md")),
+            sorted(SKILL_NAMES),
+        )
+        self.assertEqual(
+            sorted(path.parent.name for path in claude_root.glob("*/SKILL.md")),
+            sorted(SKILL_NAMES),
+        )
 
         for skill_name in SKILL_NAMES:
             agents_path = agents_root / skill_name / "SKILL.md"

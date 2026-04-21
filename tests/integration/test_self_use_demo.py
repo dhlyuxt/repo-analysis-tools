@@ -11,8 +11,9 @@ SCRIPT = ROOT / "tools" / "run_self_use_demo.py"
 
 
 class SelfUseDemoIntegrationTest(unittest.TestCase):
-    def test_run_demo_emits_expected_json_summary(self) -> None:
+    def test_run_demo_emits_expected_json_summary_and_cleans_previous_fixture(self) -> None:
         payload = run_demo()
+        repo_root = Path(payload["repo_root"])
         self.assertEqual(
             set(payload),
             {
@@ -33,7 +34,8 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
             },
         )
         self.assertRegex(payload["scan_id"], r"^scan_[0-9a-f]{12}$")
-        self.assertTrue(Path(payload["repo_root"]).is_dir())
+        self.assertTrue(repo_root.is_dir())
+        self.assertTrue(str(repo_root).startswith("/tmp/"))
         self.assertEqual(payload["symbol_name"], "easyflash_init")
         self.assertEqual(payload["symbol_path"], "easyflash/src/easyflash.c")
         self.assertEqual(payload["file_info"]["path"], "easyflash/src/easyflash.c")
@@ -50,6 +52,14 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
         self.assertGreater(payload["file_symbols"]["easyflash/src/easyflash.c"]["symbol_count"], 0)
         self.assertIn("easyflash_init", payload["file_symbols"]["easyflash/src/easyflash.c"]["symbol_names"])
 
+        sentinel = repo_root / "stale-marker.txt"
+        sentinel.write_text("stale", encoding="utf-8")
+
+        rerun_payload = run_demo()
+        self.assertEqual(rerun_payload["repo_root"], payload["repo_root"])
+        self.assertTrue(Path(rerun_payload["repo_root"]).is_dir())
+        self.assertFalse(sentinel.exists())
+
     def test_self_use_demo_script_emits_expected_json_summary(self) -> None:
         result = subprocess.run(
             ["/home/hyx/anaconda3/envs/agent/bin/python", str(SCRIPT)],
@@ -62,5 +72,6 @@ class SelfUseDemoIntegrationTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         self.assertEqual(payload["symbol_name"], "easyflash_init")
         self.assertTrue(Path(payload["repo_root"]).is_dir())
+        self.assertTrue(str(Path(payload["repo_root"])).startswith("/tmp/"))
         self.assertGreater(payload["file_symbols"]["easyflash/src/easyflash.c"]["symbol_count"], 0)
         self.assertIn("easyflash_init", payload["file_symbols"]["easyflash/src/easyflash.c"]["symbol_names"])

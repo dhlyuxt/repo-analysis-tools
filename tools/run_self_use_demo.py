@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import shutil
 import sys
+import tempfile
 from pathlib import Path
 
 
@@ -28,12 +29,14 @@ from repo_analysis_tools.mcp.tools.scan_tools import rebuild_repo_snapshot
 from tests.fixtures.easyflash_repo import FIXTURE_ROOT
 
 
-DEMO_REPO_ROOT = ROOT / ".codewiki" / "self-use-demo-fixture" / "easyflash"
+DEMO_REPO_ROOT = Path(tempfile.gettempdir()) / "repo-analysis-tools-self-use-demo" / "easyflash"
 
 
 def _materialize_demo_repo() -> Path:
+    if DEMO_REPO_ROOT.exists():
+        shutil.rmtree(DEMO_REPO_ROOT)
     DEMO_REPO_ROOT.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(FIXTURE_ROOT, DEMO_REPO_ROOT, dirs_exist_ok=True)
+    shutil.copytree(FIXTURE_ROOT, DEMO_REPO_ROOT)
     return DEMO_REPO_ROOT
 
 

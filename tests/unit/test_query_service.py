@@ -89,6 +89,26 @@ class QueryServiceTest(unittest.TestCase):
             self.assertEqual(symbol_context.lines[-1], "}")
             self.assertIn('const char *s = "}";', symbol_context.lines[1])
 
+    def test_source_backed_queries_reject_files_that_drift_after_scan(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_query_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+            service = QueryService()
+
+            symbol_id = service.resolve_symbols(repo, scan_snapshot.scan_id, "flash_init").matches[0].symbol_id
+            (repo / "src" / "flash.c").write_text(
+                "int flash_init(void) {\n"
+                "    return 999;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ValueError, "drifted since scan"):
+                service.list_file_symbols(repo, scan_snapshot.scan_id, ["src/flash.c"])
+
+            with self.assertRaisesRegex(ValueError, "drifted since scan"):
+                service.open_symbol_context(repo, scan_snapshot.scan_id, symbol_id, 0)
+
     def test_graph_queries_return_direct_relations_roots_and_bounded_paths(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = build_query_path_repo(Path(tmpdir), branch_count=10)

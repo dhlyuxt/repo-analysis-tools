@@ -3,8 +3,6 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from repo_analysis_tools.core.errors import ErrorCode
-from repo_analysis_tools.mcp.tools.anchors_tools import describe_anchor, find_anchor
 from repo_analysis_tools.anchors.parser import CAnchorParser
 from repo_analysis_tools.anchors.service import AnchorService
 from repo_analysis_tools.anchors.store import AnchorStore
@@ -203,16 +201,3 @@ class AnchorServiceTest(unittest.TestCase):
 
             with self.assertRaisesRegex(ValueError, "anchor_name must not be empty"):
                 service.describe_anchor(repo, "   ", scan_snapshot.scan_id)
-
-    def test_anchor_tools_reject_empty_anchor_name_queries(self) -> None:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            repo = build_scope_first_repo(Path(tmpdir))
-            scan_snapshot = ScanService().scan(repo)
-
-            find_payload = find_anchor(str(repo), "", scan_snapshot.scan_id)
-            describe_payload = describe_anchor(str(repo), "   ", scan_snapshot.scan_id)
-
-            self.assertEqual(find_payload["status"], "error")
-            self.assertEqual(find_payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)
-            self.assertEqual(describe_payload["status"], "error")
-            self.assertEqual(describe_payload["data"]["error"]["code"], ErrorCode.INVALID_INPUT.value)

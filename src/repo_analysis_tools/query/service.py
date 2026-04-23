@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections import defaultdict
+import hashlib
 from pathlib import Path, PurePosixPath
 import re
 
@@ -21,6 +22,8 @@ from repo_analysis_tools.query.models import (
     SymbolRow,
 )
 from repo_analysis_tools.query.path_search import enumerate_simple_paths
+from repo_analysis_tools.scan.models import ScannedFile, ScanSnapshot
+from repo_analysis_tools.scan.store import ScanStore
 from repo_analysis_tools.scope.models import ScopedFile
 from repo_analysis_tools.scope.store import ScopeStore
 
@@ -30,6 +33,9 @@ _STORAGE_RE = re.compile(r"\b(static|extern)\b")
 
 class QueryService:
     _PATH_SEARCH_LIMIT = 8
+
+    def __init__(self) -> None:
+        self._scan_snapshot_cache: dict[tuple[str, str], ScanSnapshot] = {}
 
     def list_priority_files(self, target_repo: Path | str, scan_id: str) -> tuple[PriorityFileRow, ...]:
         scope_snapshot = self._load_scope_snapshot(target_repo, scan_id)
@@ -129,7 +135,7 @@ class QueryService:
             incoming_call_counts[relation.target_anchor_id] += 1
 
         roots = [
-            self._symbol_row_from_anchor(anchor, target_repo)
+            self._symbol_row_from_anchor(anchor, target_repo, scan_id)
             for anchor in anchor_snapshot.anchors
             if anchor.kind == "function_definition"
             and anchor.path in selected_paths
@@ -209,7 +215,7 @@ class QueryService:
         rows = []
         for path in normalized_paths:
             symbols = [
-                self._symbol_row_from_anchor(anchor, target_repo)
+                self._symbol_row_from_anchor(anchor, target_repo, scan_id)
                 for anchor in self._anchors_for_path(anchor_snapshot.anchors, path)
             ]
             rows.append(FileSymbolsRow(path=path, symbols=tuple(symbols)))
@@ -225,7 +231,7 @@ class QueryService:
         anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
         anchors = [anchor for anchor in anchor_snapshot.anchors if anchor.name == normalized_name]
         rows = tuple(
-            self._symbol_row_from_anchor(anchor, target_repo)
+            self._symbol_row_from_anchor(anchor, target_repo, scan_id)
             for anchor in sorted(anchors, key=self._symbol_sort_key)
         )
         return SymbolMatchResult(match_count=len(rows), matches=rows)
@@ -242,8 +248,7 @@ class QueryService:
         anchor_snapshot = self._load_anchor_snapshot(target_repo, scan_id)
         anchor = self._find_anchor(anchor_snapshot.anchors, symbol_id)
         anchor = self._preferred_definition_anchor(anchor_snapshot.anchors, anchor)
-        repo = Path(target_repo).expanduser().resolve()
-        source_lines = (repo / anchor.path).read_text(encoding="utf-8", errors="ignore").splitlines()
+        source_lines = self._source_lines_for_anchor(target_repo, scan_id, anchor)
         definition_end = self._definition_end_line(anchor, source_lines)
         definition_start = anchor.start_line
         context_start = max(1, definition_start - context_lines)
@@ -265,6 +270,16 @@ class QueryService:
 
     def _load_anchor_snapshot(self, target_repo: Path | str, scan_id: str):
         return AnchorStore.for_repo(target_repo).load(scan_id)
+
+    def _load_scan_snapshot(self, target_repo: Path | str, scan_id: str) -> ScanSnapshot:
+        repo = Path(target_repo).expanduser().resolve().as_posix()
+        cache_key = (repo, scan_id)
+        cached = self._scan_snapshot_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        snapshot = ScanStore.for_repo(repo).load(scan_id)
+        self._scan_snapshot_cache[cache_key] = snapshot
+        return snapshot
 
     def _function_anchor_for_id(self, anchors: list[AnchorRecord], symbol_id: str) -> AnchorRecord:
         anchor = self._find_anchor(anchors, symbol_id)
@@ -302,8 +317,8 @@ class QueryService:
             key=self._symbol_sort_key,
         )
 
-    def _symbol_row_from_anchor(self, anchor: AnchorRecord, target_repo: Path | str) -> SymbolRow:
-        source_lines = self._source_lines_for_anchor(target_repo, anchor)
+    def _symbol_row_from_anchor(self, anchor: AnchorRecord, target_repo: Path | str, scan_id: str) -> SymbolRow:
+        source_lines = self._source_lines_for_anchor(target_repo, scan_id, anchor)
         storage = self._infer_storage(anchor, source_lines)
         return SymbolRow(
             symbol_id=anchor.anchor_id,
@@ -316,9 +331,29 @@ class QueryService:
             storage=storage,
         )
 
-    def _source_lines_for_anchor(self, target_repo: Path | str, anchor: AnchorRecord) -> list[str]:
+    def _source_lines_for_anchor(self, target_repo: Path | str, scan_id: str, anchor: AnchorRecord) -> list[str]:
+        return self._source_lines_for_path(target_repo, scan_id, anchor.path)
+
+    def _source_lines_for_path(self, target_repo: Path | str, scan_id: str, path: str) -> list[str]:
         repo = Path(target_repo).expanduser().resolve()
-        return (repo / anchor.path).read_text(encoding="utf-8", errors="ignore").splitlines()
+        normalized_path = self._normalize_repo_path(path)
+        scan_snapshot = self._load_scan_snapshot(repo, scan_id)
+        scanned_file = self._find_scanned_file(scan_snapshot.files, normalized_path)
+        file_path = repo / normalized_path
+        try:
+            content = file_path.read_bytes()
+        except FileNotFoundError as exc:
+            raise ValueError(f"file {normalized_path} drifted since scan {scan_id}") from exc
+        if hashlib.sha256(content).hexdigest() != scanned_file.content_sha256:
+            raise ValueError(f"file {normalized_path} drifted since scan {scan_id}")
+
+        return content.decode("utf-8", errors="ignore").splitlines()
+
+    def _find_scanned_file(self, scanned_files: list[ScannedFile], path: str) -> ScannedFile:
+        for scanned_file in scanned_files:
+            if scanned_file.path == path:
+                return scanned_file
+        raise FileNotFoundError(f"file {path} was not found in scan snapshot")
 
     def _infer_storage(self, anchor: AnchorRecord, source_lines: list[str]) -> str:
         if anchor.start_line <= 0 or anchor.start_line > len(source_lines):

@@ -41,6 +41,7 @@ def enumerate_simple_paths(
         if node == goal:
             if len(found) < limit:
                 found.append(list(path))
+                continue
             else:
                 truncated = True
                 break

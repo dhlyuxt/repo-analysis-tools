@@ -9,12 +9,12 @@ from repo_analysis_tools.scan.service import ScanService
 
 @mcp.tool()
 def rebuild_repo_snapshot(target_repo: str) -> dict[str, object]:
-    repo_path = Path(target_repo).expanduser().resolve()
-    if not repo_path.exists():
-        return error_response(ErrorCode.INVALID_INPUT, f"repository path does not exist: {target_repo}")
-    if not repo_path.is_dir():
-        return error_response(ErrorCode.INVALID_INPUT, f"repository path is not a directory: {target_repo}")
     try:
+        repo_path = Path(target_repo).expanduser().resolve()
+        if not repo_path.exists():
+            return error_response(ErrorCode.INVALID_INPUT, f"repository path does not exist: {target_repo}")
+        if not repo_path.is_dir():
+            return error_response(ErrorCode.INVALID_INPUT, f"repository path is not a directory: {target_repo}")
         snapshot = ScanService().scan(target_repo)
         anchor_snapshot = AnchorStore.for_repo(target_repo).load(scan_id=snapshot.scan_id)
         remember_scan(snapshot.scan_id, snapshot.repo_root)
@@ -22,6 +22,8 @@ def rebuild_repo_snapshot(target_repo: str) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return error_response(ErrorCode.INTERNAL, str(exc))
     data = {
         "scan_id": snapshot.scan_id,
         "file_count": snapshot.file_count,

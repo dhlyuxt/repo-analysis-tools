@@ -24,6 +24,10 @@ def _call_relation_rows(rows) -> list[dict[str, object]]:
     ]
 
 
+def _internal_error(exc: Exception) -> dict[str, object]:
+    return error_response(ErrorCode.INTERNAL, str(exc))
+
+
 @mcp.tool()
 def list_priority_files(scan_id: str) -> dict[str, object]:
     try:
@@ -33,6 +37,8 @@ def list_priority_files(scan_id: str) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={"files": [{"path": row.path, "priority_score": row.priority_score} for row in rows]},
         messages=[],
@@ -49,6 +55,8 @@ def get_file_info(scan_id: str, path: str) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data=dict(row.__dict__),
         messages=[],
@@ -65,6 +73,8 @@ def list_file_symbols(scan_id: str, paths: list[str]) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={
             "files": [
@@ -89,6 +99,8 @@ def resolve_symbols(scan_id: str, symbol_name: str) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={
             "match_count": result.match_count,
@@ -108,6 +120,8 @@ def open_symbol_context(scan_id: str, symbol_id: str, context_lines: int) -> dic
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={
             **dict(row.__dict__),
@@ -127,6 +141,8 @@ def query_call_relations(scan_id: str, function_id: str) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={
             "callers": _call_relation_rows(result.callers),
@@ -147,6 +163,8 @@ def find_root_functions(scan_id: str, paths: list[str]) -> dict[str, object]:
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={"roots": _symbol_rows(rows)},
         messages=[],
@@ -163,6 +181,8 @@ def find_call_paths(scan_id: str, from_function_id: str, to_function_id: str) ->
         return error_response(ErrorCode.INVALID_INPUT, str(exc))
     except FileNotFoundError as exc:
         return error_response(ErrorCode.NOT_FOUND, str(exc))
+    except Exception as exc:
+        return _internal_error(exc)
     return ok_response(
         data={
             "status": result.status,

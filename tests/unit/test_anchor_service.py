@@ -31,6 +31,63 @@ def build_ambiguous_call_target_repo(tmp_path: Path) -> Path:
     return repo
 
 
+def build_static_helper_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "static-helper-repo"
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "a.c").write_text(
+        "static int helper(void) { return 1; }\n"
+        "int a(void) { return helper(); }\n",
+        encoding="utf-8",
+    )
+    (repo / "src" / "b.c").write_text(
+        "int b(void) { return helper(); }\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
+def build_long_static_helper_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "long-static-helper-repo"
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "a.c").write_text(
+        "static\n"
+        "inline\n"
+        "const\n"
+        "volatile\n"
+        "long\n"
+        "int\n"
+        "helper\n"
+        "(\n"
+        "    void\n"
+        ")\n"
+        "{\n"
+        "    return 1;\n"
+        "}\n"
+        "int a(void) { return helper(); }\n",
+        encoding="utf-8",
+    )
+    (repo / "src" / "b.c").write_text(
+        "int b(void) { return helper(); }\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
+def build_comment_static_global_helper_repo(tmp_path: Path) -> Path:
+    repo = tmp_path / "comment-static-global-helper-repo"
+    (repo / "src").mkdir(parents=True, exist_ok=True)
+    (repo / "src" / "a.c").write_text(
+        "/* static helper used to live here */\n"
+        "int helper(void) { return 1; }\n",
+        encoding="utf-8",
+    )
+    (repo / "src" / "b.c").write_text(
+        "int b(void) { return helper(); }\n",
+        encoding="utf-8",
+    )
+    return repo
+
+
 class AnchorServiceTest(unittest.TestCase):
     def test_parser_uses_tree_sitter_primary_path_when_runtime_is_compatible(self) -> None:
         parser = CAnchorParser()
@@ -171,6 +228,71 @@ class AnchorServiceTest(unittest.TestCase):
 
             self.assertEqual(len(matching_relations), 1)
             self.assertNotIn(matching_relations[0].target_anchor_id, ambiguous_definition_ids)
+
+    def test_build_snapshot_does_not_resolve_cross_file_calls_to_static_definitions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_static_helper_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = AnchorService().build_snapshot(repo, scan_snapshot.scan_id)
+            helper_definition = next(
+                anchor
+                for anchor in snapshot.anchors
+                if anchor.name == "helper" and anchor.kind == "function_definition"
+            )
+            helper_relations = {
+                relation.source_name: relation
+                for relation in snapshot.relations
+                if relation.kind == "direct_call" and relation.target_name == "helper"
+            }
+
+            self.assertEqual(helper_relations["a"].target_anchor_id, helper_definition.anchor_id)
+            self.assertEqual(helper_relations["a"].target_path, "src/a.c")
+            self.assertIsNone(helper_relations["b"].target_anchor_id)
+            self.assertIsNone(helper_relations["b"].target_path)
+
+    def test_build_snapshot_does_not_resolve_cross_file_calls_to_long_static_definitions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_long_static_helper_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = AnchorService().build_snapshot(repo, scan_snapshot.scan_id)
+            helper_definition = next(
+                anchor
+                for anchor in snapshot.anchors
+                if anchor.name == "helper" and anchor.kind == "function_definition"
+            )
+            helper_relations = {
+                relation.source_name: relation
+                for relation in snapshot.relations
+                if relation.kind == "direct_call" and relation.target_name == "helper"
+            }
+
+            self.assertEqual(helper_relations["a"].target_anchor_id, helper_definition.anchor_id)
+            self.assertEqual(helper_relations["a"].target_path, "src/a.c")
+            self.assertIsNone(helper_relations["b"].target_anchor_id)
+            self.assertIsNone(helper_relations["b"].target_path)
+
+    def test_build_snapshot_ignores_static_in_comments_when_resolving_global_definitions(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = build_comment_static_global_helper_repo(Path(tmpdir))
+            scan_snapshot = ScanService().scan(repo)
+
+            snapshot = AnchorService().build_snapshot(repo, scan_snapshot.scan_id)
+            helper_definition = next(
+                anchor
+                for anchor in snapshot.anchors
+                if anchor.name == "helper" and anchor.kind == "function_definition"
+            )
+            matching_relations = [
+                relation
+                for relation in snapshot.relations
+                if relation.kind == "direct_call" and relation.source_name == "b"
+            ]
+
+            self.assertEqual(len(matching_relations), 1)
+            self.assertEqual(matching_relations[0].target_anchor_id, helper_definition.anchor_id)
+            self.assertEqual(matching_relations[0].target_path, "src/a.c")
 
     def test_describe_anchor_for_easyflash_includes_direct_call_relation(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path, PurePosixPath
+import re
 
 from repo_analysis_tools.anchors.models import AnchorDescription, AnchorRelation, AnchorSnapshot
-from repo_analysis_tools.anchors.parser import CAnchorParser
+from repo_analysis_tools.anchors.parser import CAnchorParser, _strip_comments_and_strings
 from repo_analysis_tools.anchors.store import AnchorStore
 from repo_analysis_tools.scan.store import ScanStore
 
@@ -27,7 +28,7 @@ class AnchorService:
             extraction_backend = parsed.backend
             anchors.extend(parsed.anchors)
             relations.extend(parsed.relations)
-        relations = self._relinked_relations(anchors, relations)
+        relations = self._relinked_relations(repo, anchors, relations)
         snapshot = AnchorSnapshot(
             scan_id=scan_snapshot.scan_id,
             repo_root=scan_snapshot.repo_root,
@@ -115,11 +116,13 @@ class AnchorService:
 
     def _relinked_relations(
         self,
+        repo: Path,
         anchors: list,
         relations: list[AnchorRelation],
     ) -> list[AnchorRelation]:
         anchors_by_id = {anchor.anchor_id: anchor for anchor in anchors}
         definition_anchors_by_name: dict[str, list] = {}
+        static_definition_ids = self._static_definition_ids(repo, anchors)
         known_paths = {anchor.path for anchor in anchors}
 
         for anchor in anchors:
@@ -133,8 +136,11 @@ class AnchorService:
         relinked: list[AnchorRelation] = []
         for relation in relations:
             if relation.kind == "direct_call":
-                target_anchor = self._resolve_repo_wide_call_target(
+                source_anchor = anchors_by_id.get(relation.source_anchor_id)
+                target_anchor = self._resolve_call_target(
                     definition_anchors_by_name,
+                    static_definition_ids,
+                    source_anchor.path if source_anchor is not None else None,
                     relation.target_name,
                 )
                 if target_anchor is not None:
@@ -173,15 +179,50 @@ class AnchorService:
             relinked.append(relation)
         return relinked
 
-    def _resolve_repo_wide_call_target(
+    def _resolve_call_target(
         self,
         definition_anchors_by_name: dict[str, list],
+        static_definition_ids: set[str],
+        source_path: str | None,
         target_name: str,
     ):
         candidates = definition_anchors_by_name.get(target_name, [])
-        if len(candidates) != 1:
+        if source_path is not None:
+            same_file_candidates = [candidate for candidate in candidates if candidate.path == source_path]
+            if len(same_file_candidates) == 1:
+                return same_file_candidates[0]
+
+        visible_candidates = [
+            candidate for candidate in candidates if candidate.anchor_id not in static_definition_ids
+        ]
+        if len(visible_candidates) != 1:
             return None
-        return candidates[0]
+        return visible_candidates[0]
+
+    def _static_definition_ids(self, repo: Path, anchors: list) -> set[str]:
+        static_ids: set[str] = set()
+        source_cache: dict[str, str] = {}
+        for anchor in anchors:
+            if anchor.kind != "function_definition":
+                continue
+            source_text = source_cache.get(anchor.path)
+            if source_text is None:
+                source_text = (repo / anchor.path).read_text(encoding="utf-8", errors="ignore")
+                source_cache[anchor.path] = source_text
+            if self._is_static_function_definition(source_text, anchor.name, anchor.start_line, anchor.end_line):
+                static_ids.add(anchor.anchor_id)
+        return static_ids
+
+    def _is_static_function_definition(self, source_text: str, name: str, start_line: int, end_line: int) -> bool:
+        lines = source_text.splitlines()
+        header_start = max(0, start_line - 1)
+        header_end = min(len(lines), max(start_line, end_line))
+        header = "\n".join(lines[header_start:header_end])
+        cleaned_header = _strip_comments_and_strings(header)
+        match = re.search(rf"\b{re.escape(name)}\s*\(", cleaned_header)
+        if match is None:
+            return False
+        return re.search(r"\bstatic\b", cleaned_header[: match.start()]) is not None
 
     def _resolve_include_target_path(
         self,

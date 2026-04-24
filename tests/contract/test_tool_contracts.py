@@ -2,6 +2,7 @@ import inspect
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 from repo_analysis_tools.mcp.tools import query_tools, scan_tools
@@ -198,3 +199,22 @@ class ToolContractsTest(unittest.TestCase):
 
             self.assertEqual(payload["status"], "error")
             self.assertEqual(payload["data"]["error"]["code"], "invalid_input")
+
+    def test_rebuild_repo_snapshot_wraps_unexpected_scan_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with mock.patch.object(scan_tools.ScanService, "scan", side_effect=PermissionError("no access")):
+                payload = rebuild_repo_snapshot(tmpdir)
+
+            self.assertEqual(payload["status"], "error")
+            self.assertEqual(payload["data"]["error"]["code"], "internal")
+
+    def test_query_tool_wraps_unexpected_service_error(self) -> None:
+        with mock.patch.object(query_tools, "repo_root_for_scan", return_value="/repo"), mock.patch.object(
+            query_tools.QueryService,
+            "list_priority_files",
+            side_effect=OSError("storage unavailable"),
+        ):
+            payload = list_priority_files("scan_123456abcdef")
+
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["data"]["error"]["code"], "internal")

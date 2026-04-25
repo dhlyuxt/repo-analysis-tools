@@ -10,6 +10,7 @@ from repo_analysis_tools.mcp.contracts import CONTRACT_BY_NAME, DOMAIN_CONTRACTS
 REPO_ROOT = Path(__file__).resolve().parents[2]
 ARCHITECTURE_DOC = REPO_ROOT / "docs" / "architecture.md"
 CONTRACT_DOC = REPO_ROOT / "docs" / "contracts" / "mcp-tool-contracts.md"
+REPO_DOC_WRITER_SKILL = REPO_ROOT / ".agents" / "skills" / "repo-doc-writer" / "SKILL.md"
 REPO_UNDERSTAND_SKILL = REPO_ROOT / ".agents" / "skills" / "repo-understand" / "SKILL.md"
 
 EXPECTED_ARCHITECTURE_BOUNDARIES = {
@@ -200,3 +201,29 @@ class ArchitectureDocsTest(unittest.TestCase):
         self.assertIn("find_call_paths", skill)
         self.assertNotIn("scan_repo", skill)
         self.assertNotIn("build_evidence_pack", skill)
+
+    def test_repo_doc_writer_skill_is_subagent_scoped_and_dsl_driven(self) -> None:
+        skill = self.read_text(REPO_DOC_WRITER_SKILL)
+
+        for expected_text in (
+            "document writer subagent",
+            "Do not use this skill in the coordinating agent",
+            "doc_specs",
+            "doc_dsl",
+            "MarkdownRenderer",
+            "not free-form Markdown",
+        ):
+            self.assertIn(expected_text, skill)
+
+        for repository_reading_tool in (
+            "rebuild_repo_snapshot",
+            "list_priority_files",
+            "get_file_info",
+            "list_file_symbols",
+            "resolve_symbols",
+            "open_symbol_context",
+            "query_call_relations",
+            "find_root_functions",
+            "find_call_paths",
+        ):
+            self.assertNotIn(repository_reading_tool, skill)

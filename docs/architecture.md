@@ -50,6 +50,20 @@ The supported persistence model is JSON-first and domain-owned. Each rebuild wri
 
 `rebuild_repo_snapshot` must complete before any query tool is used in the same process. The process-local `scan_id -> repo_root` registry is what lets the query wrappers recover the repo root without accepting a `target_repo` argument.
 
+## Repository Design Document Handoff
+
+Repository design documentation is a separate handoff from repository understanding:
+
+```text
+repository audit workflow
+-> structured findings package
+-> document writer subagent loads repo-doc-writer
+-> doc_specs / doc_dsl / validators / MarkdownRenderer
+-> docs/repo-design/*
+```
+
+The coordinating agent remains orchestration-only. It prepares and hands off structured findings, but does not absorb section policy or renderer rules from the document pipeline.
+
 ## Runtime Root And Path Rules
 
 All runtime-owned artifacts live under `<target_repo>/.codewiki/`.

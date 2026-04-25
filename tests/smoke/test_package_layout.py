@@ -32,7 +32,9 @@ EXPECTED_DIRECTORIES = [
 EXPECTED_FILES = [
     ROOT / ".codex" / "config.toml",
     ROOT / ".mcp.json",
+    ROOT / ".agents" / "skills" / "repo-doc-writer" / "SKILL.md",
     ROOT / ".agents" / "skills" / "repo-understand" / "SKILL.md",
+    ROOT / ".claude" / "skills" / "repo-doc-writer" / "SKILL.md",
     ROOT / ".claude" / "skills" / "repo-understand" / "SKILL.md",
     ROOT / "docs" / "self-use-launch.md",
     ROOT / "tools" / "run_self_use_demo.py",

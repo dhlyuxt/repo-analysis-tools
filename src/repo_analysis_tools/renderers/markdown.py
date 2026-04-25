@@ -11,7 +11,12 @@ class MarkdownRenderer:
             for block in section.blocks:
                 lines.append("")
                 if isinstance(block, TextBlock):
+                    if block.title is not None:
+                        lines.extend([f"### {block.title}", ""])
                     lines.append(block.text)
+                    evidence_lines = render_evidence_bindings(block.evidence_bindings)
+                    if evidence_lines:
+                        lines.extend(["", *evidence_lines])
                     continue
                 if block.title is not None:
                     lines.extend([f"### {block.title}", ""])

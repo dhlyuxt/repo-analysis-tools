@@ -43,13 +43,22 @@ The repository currently exposes one MCP server with a nine-tool active surface.
 
 ## Current Skills
 
-The repository currently mirrors one workflow skill across [`.agents/skills`](./.agents/skills) and [`.claude/skills`](./.claude/skills): `repo-understand`.
+The repository currently mirrors two workflow skills across [`.agents/skills`](./.agents/skills) and [`.claude/skills`](./.claude/skills):
+
+- `repo-understand`
+- `repo-doc-writer`
 
 ### `repo-understand`
 
 - Purpose: analyze an unfamiliar C repository through the query-first surface.
 - Required order: `rebuild_repo_snapshot -> list_priority_files -> get_file_info -> list_file_symbols/resolve_symbols -> open_symbol_context/query_call_relations/find_root_functions/find_call_paths`
 - Use when you want repository understanding grounded in the active MCP surface rather than ad hoc source browsing.
+
+### `repo-doc-writer`
+
+- Purpose: produce a controlled repository design document set from structured findings.
+- Scope: document-writer subagent only; the coordinating agent stays focused on orchestration.
+- Output path: final Markdown comes from the typed document pipeline, not free-form drafting.
 
 ## Runtime Outputs
 

@@ -21,7 +21,31 @@ def validate_document(document: Document, spec: DocumentSpec) -> list[str]:
         mermaid_blocks = [block for block in section.blocks if isinstance(block, MermaidBlock)]
         if policy.mermaid_policy == "required" and not mermaid_blocks:
             errors.append(f"section '{section.title}' requires at least one MermaidBlock")
+        if (
+            policy.mermaid_policy == "required"
+            and policy.requires_evidence_bindings
+            and mermaid_blocks
+            and not any(block.evidence_bindings for block in mermaid_blocks)
+        ):
+            errors.append(
+                f"section '{section.title}' requires an evidence-bound MermaidBlock"
+            )
         if policy.mermaid_policy == "disallowed" and mermaid_blocks:
             errors.append(f"section '{section.title}' disallows MermaidBlock")
+        if policy.requires_evidence_bindings:
+            evidence_capable_blocks = [
+                block for block in section.blocks if hasattr(block, "evidence_bindings")
+            ]
+            evidence_bound_blocks = [
+                block
+                for block in evidence_capable_blocks
+                if getattr(block, "evidence_bindings", [])
+            ]
+            if not evidence_bound_blocks:
+                errors.append(f"section '{section.title}' requires evidence-bound blocks")
+            elif len(evidence_bound_blocks) != len(evidence_capable_blocks):
+                errors.append(
+                    f"section '{section.title}' requires every block to be evidence-bound"
+                )
 
     return errors

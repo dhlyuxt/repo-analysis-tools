@@ -14,6 +14,8 @@ class EvidenceBinding:
 @dataclass(frozen=True)
 class TextBlock:
     text: str
+    evidence_bindings: list[EvidenceBinding] = field(default_factory=list)
+    title: str | None = None
 
 
 @dataclass(frozen=True)
